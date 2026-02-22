@@ -1,0 +1,7 @@
+{
+  "name": "skill-registry",
+  "version": "0.1.0",
+  "description": "Shared skills and utilities for agents",
+  "skills": [],
+  "shared": []
+}
