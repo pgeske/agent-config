@@ -2,6 +2,16 @@
   "name": "skill-registry",
   "version": "0.1.0",
   "description": "Shared skills and utilities for agents",
-  "skills": [],
+  "skills": [
+    "find-model",
+    "get-amazon-order-history",
+    "homeassistant",
+    "light-manager",
+    "moviescout",
+    "review-emails",
+    "shoppingassistant",
+    "showscout",
+    "subtitlescout"
+  ],
   "shared": []
 }
