@@ -1,6 +1,10 @@
 ---
 name: review-emails
 description: Review the last 2 days of unread Gmail across all authenticated gog accounts, mark those emails as read, and produce one concise, actionable cross-account summary (not per-email). Use when the user asks for an inbox catch-up, email digest, important/actionable highlights, or a quick "what matters" summary.
+version: "0.1.0"
+author: alyosha
+dependencies:
+  - gog (gmail)
 ---
 
 # review-emails

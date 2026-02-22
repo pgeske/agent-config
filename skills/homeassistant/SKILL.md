@@ -1,6 +1,9 @@
 ---
 name: homeassistant
 description: Control Home Assistant with natural language. Use when the user wants to interact with lights, switches, climate, media, covers, or any HA entity. Accepts fuzzy commands like "turn on the living room light" or "set the bedroom to 72 degrees". First tries HA's built-in conversation API; if that fails, falls back to custom entity resolution by querying states and services. Always reports what happened or why it couldn't.
+version: "0.1.0"
+author: alyosha
+dependencies: []
 ---
 
 # Home Assistant Control (hactl)

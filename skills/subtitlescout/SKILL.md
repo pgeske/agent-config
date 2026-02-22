@@ -1,6 +1,10 @@
 ---
 name: subtitlescout
 description: Manage subtitles via Bazarr (status/health, list series/movies, search and download subtitles). Use whenever the user asks about subtitles, Bazarr, subtitle downloads, missing subs, or subtitle management.
+version: "0.1.0"
+author: alyosha
+dependencies:
+  - bazarr
 ---
 
 # SubtitleScout (Bazarr)

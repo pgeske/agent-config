@@ -1,15 +1,20 @@
 ---
 name: shoppingassistant
 description: Research and shop for products, then add the best Amazon option to cart without checkout. Use when the user asks to shop, buy, find, compare, or add an item to Amazon cart from either a vague need or an exact product name. Always run this skill in a sub-agent because it is multi-step and browser-heavy.
+version: "0.1.0"
+author: alyosha
+dependencies:
+  - browser (amazon)
+  - sub-agent
 ---
 
 # shoppingassistant
 
-## overview
+## Overview
 
 Use this skill to convert a shopping request into a completed Amazon cart action (or an external buy link if Amazon has no good option).
 
-## workflow
+## Workflow
 
 1. **always run in a sub-agent**
    - spawn a sub-agent for every request that triggers this skill.

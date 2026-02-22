@@ -1,6 +1,10 @@
 ---
 name: light-manager
 description: Manages home lighting using natural language commands by interfacing with the homeassistant skill. Supports turning lights on/off, adjusting brightness, changing colors, applying themes (e.g., "Harry Potter mode"), and querying light status (e.g., "how long has this been on?"). Use when the user wants to control lights via the Home Assistant integration with simple, conversational instructions. The skill interprets the request, executes the appropriate action via homeassistant, and reports the result back to the user with clear confirmation or explanation of any issues.
+version: "0.1.0"
+author: alyosha
+dependencies:
+  - homeassistant
 ---
 
 # Light Manager

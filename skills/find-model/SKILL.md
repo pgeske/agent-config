@@ -1,6 +1,9 @@
 ---
 name: find-model
 description: Find, validate, and add an OpenClaw model from a model name or model description. Use when a user asks whether a model is supported, wants a new model added to OpenClaw config, or sees model selection fallback behavior. Check local OpenClaw catalog first, run OpenClaw update + gateway restart if missing, and add the model only if it becomes available.
+version: "0.1.0"
+author: alyosha
+dependencies: []
 ---
 
 # Find Model

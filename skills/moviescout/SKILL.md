@@ -1,6 +1,10 @@
 ---
 name: moviescout
 description: Request movies via Radarr using interactive search. Use when the user wants to add/request a movie, search for a movie to download, or get movie release quality information. Automatically searches for the movie, performs interactive search to find releases, picks the highest quality release based on custom format scores, and grabs it. Shows detailed quality info including resolution, Dolby Vision, HDR, and audio format.
+version: "0.1.0"
+author: alyosha
+dependencies:
+  - radarr
 ---
 
 # MovieScout

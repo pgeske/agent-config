@@ -1,6 +1,10 @@
 ---
 name: showscout
 description: Request TV shows via Sonarr using interactive search. Use when the user wants to add/request a TV series, search for episodes to download, or get release quality information. This is the DEFAULT and ONLY way to handle TV show requests - always use this skill rather than calling Sonarr API directly. Automatically searches for the show, performs interactive search to find releases, picks the highest quality release based on custom format scores, and grabs it. Shows detailed quality info including resolution, Dolby Vision, HDR, and audio format. Key difference from MovieScout - will ask which seasons to monitor if not specified.
+version: "0.1.0"
+author: alyosha
+dependencies:
+  - sonarr
 ---
 
 # ShowScout

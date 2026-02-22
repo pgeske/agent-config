@@ -1,6 +1,11 @@
 ---
 name: get-amazon-order-history
 description: Look up Amazon order history and specific orders for the user. Use when the user asks about Amazon purchases, orders, deliveries, or wants to check if a specific item was ordered. First searches Gmail for Amazon order emails, then falls back to the Amazon website via browser if email results are insufficient.
+version: "0.1.0"
+author: alyosha
+dependencies:
+  - gog (gmail)
+  - browser (amazon)
 ---
 
 # Get Amazon Order History
