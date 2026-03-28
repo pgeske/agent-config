@@ -16,14 +16,15 @@ Run a fast inbox sweep across every gog-authenticated Gmail account, clear unrea
 1. Run:
 
 ```bash
-/home/alyosha/.openclaw/workspace/skills/review-emails/scripts/fetch_and_mark_unread_2d.sh
+/home/alyosha/.opencode/workspace/skills/review-emails/scripts/fetch_and_mark_unread_2d.sh
 ```
 
 This script will:
 - discover all gog-authenticated accounts with Gmail access
 - fetch `newer_than:2d label:UNREAD` messages (with body)
 - write combined output to:
-  - `/home/alyosha/.openclaw/workspace/emails_unread_2d.json`
+  - `/home/alyosha/.opencode/workspace/emails_unread_2d.json`
+  - `/home/alyosha/.opencode/workspace/emails_unread_2d.txt`
   - `/home/alyosha/.openclaw/workspace/emails_unread_2d.txt`
 - mark matched threads as read in each account
 

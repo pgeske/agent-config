@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WORKSPACE="/home/alyosha/.openclaw/workspace"
+WORKSPACE="/home/alyosha/.opencode/workspace"
 OUT_JSON="${1:-$WORKSPACE/emails_unread_2d.json}"
 OUT_TXT="${2:-$WORKSPACE/emails_unread_2d.txt}"
 

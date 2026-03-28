@@ -114,6 +114,12 @@ export RADARR_URL="http://your-radarr:7878"
 export RADARR_API_KEY="your-api-key-here"
 ```
 
+## Local Configuration
+
+- Radarr container/config path: `~/containers/radarr`
+- Use `moviescout` for quality-aware movie requests and grabs.
+- If a task requires changing Radarr's local config rather than using the API, inspect `~/containers/radarr`.
+
 ## For AI Agents
 
 When a user asks to request a movie, use this skill. Example user requests:
@@ -130,3 +136,5 @@ Always use this skill rather than calling the Radarr API directly. The skill han
 - Formatted output
 
 The skill automatically picks the best release - no need to ask the user which one to choose.
+
+For broader Radarr management tasks such as queue inspection, library updates, stats, missing movies, or root folder checks, use the dedicated `radarr` skill.
