@@ -1,0 +1,5 @@
+targets:
+  - ~/.openclaw/workspace/skills
+  - ~/.opencode/skills
+  - ~/.config/opencode/skills
+  - ~/.codex/skills

@@ -1,4 +1,7 @@
 interface:
   display_name: "Find Model"
+  short_description: "Find and add supported models"
+  default_prompt: "Find whether a model is supported and add it to config without changing defaults unless asked."
+  display_name: "Find Model"
   short_description: "Find and add supported OpenClaw models"
   default_prompt: "Find whether a model is supported by OpenClaw and add it to config without changing defaults unless asked."
