@@ -75,7 +75,7 @@ Result:
 
 ### Deterministic local interaction smoke
 
-Fixture setup wrote `/tmp/agent-browser-smoke.html` with a text input, a submit button, and a status node updated by button click.
+Fixture setup refreshed `/tmp/agent-browser-smoke.html` with title `Agent Browser Smoke`, selectors `#name`, `#submit`, and `#status`, and a button handler that updates the status text to `Status: hello, <name>`.
 
 Command sequence:
 
@@ -96,22 +96,89 @@ Result:
 - Session closed cleanly.
 - This is the verified local evidence for input interaction; the remote smoke above does not itself prove fill/click behavior.
 
-## Headed-mode and XRDP viability
+## Headed-mode default and XRDP/LXQt verification
 
-Command attempted:
+This machine's documented default browser path is now headed mode on the XRDP/LXQt desktop at `DISPLAY=:10`.
+
+Final headed-default interaction smoke command:
 
 ```bash
-agent-browser --headed --session skill-registry-headed open https://example.com && \
-agent-browser --session skill-registry-headed get title && \
-agent-browser --session skill-registry-headed close
+DISPLAY=:10 agent-browser --headed --session final-headed-default open file:///tmp/agent-browser-smoke.html && \
+DISPLAY=:10 agent-browser --session final-headed-default fill "#name" "Alyosha" && \
+DISPLAY=:10 agent-browser --session final-headed-default click "#submit" && \
+DISPLAY=:10 agent-browser --session final-headed-default get text "#status" && \
+DISPLAY=:10 agent-browser --session final-headed-default close
 ```
 
 Result:
 
-- Failed in this environment.
-- Chrome exited early because no X server or `$DISPLAY` was available.
-- `env | rg '^(DISPLAY|WAYLAND_DISPLAY|XRDP)'` returned no matching variables.
-- Current conclusion: headed mode is not locally viable in this shell unless it is run inside a desktop/XRDP session or another environment that provides a working display server.
+- Passed on `DISPLAY=:10`.
+- Headed mode is the documented default on this machine.
+- `DISPLAY=:10` is the documented preferred XRDP/LXQt display for headed launches on this machine.
+- The actual observed `get text "#status"` output was `Status: hello, Alyosha`.
+- Session closed cleanly.
+
+Fallback policy:
+
+- If `DISPLAY=:10` is unavailable, agents should report that failure explicitly.
+- Agents should only try another display after that display has been verified to work.
+- Headless mode is documented as the fallback path when no verified headed display is available.
+
+Verification commands run and observed returns:
+
+```text
+node -e 'const fs=require("fs"); const html=fs.readFileSync("/tmp/agent-browser-smoke.html","utf8"); const out={exists:fs.existsSync("/tmp/agent-browser-smoke.html"), title:/<title>([^<]*)<\/title>/i.test(html)&&RegExp.$1==="Agent Browser Smoke", name:/id="name"/.test(html), submit:/id="submit"/.test(html), status:/id="status"/.test(html)}; console.log(JSON.stringify(out, null, 2));'
+```
+
+- Returned:
+
+```json
+{
+  "exists": true,
+  "title": true,
+  "name": true,
+  "submit": true,
+  "status": true
+}
+```
+
+- This fixture check was recorded before the headed run and preserves the concrete smoke-fixture evidence that the local page still matched the expected title and selectors.
+
+```text
+read /tmp/agent-browser-smoke.html
+```
+
+- Confirmed title `Agent Browser Smoke` and selectors `#name`, `#submit`, and `#status` are still present in `/tmp/agent-browser-smoke.html`.
+
+```text
+DISPLAY=:10 agent-browser --headed --session final-headed-default open file:///tmp/agent-browser-smoke.html
+```
+
+- Returned page title line `Agent Browser Smoke` and URL `file:///tmp/agent-browser-smoke.html`.
+
+```text
+DISPLAY=:10 agent-browser --session final-headed-default fill "#name" "Alyosha"
+```
+
+- Returned `Done`.
+
+```text
+DISPLAY=:10 agent-browser --session final-headed-default click "#submit"
+```
+
+- Returned `Done`.
+
+```text
+DISPLAY=:10 agent-browser --session final-headed-default get text "#status"
+```
+
+- Returned `Status: hello, Alyosha`.
+
+```text
+DISPLAY=:10 agent-browser --session final-headed-default close
+```
+
+- Returned `Browser closed`.
 
 ## Install footprint clarification
 

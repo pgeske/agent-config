@@ -8,9 +8,21 @@ dependencies: []
 
 # Browser Automation with agent-browser
 
+## Local Display Rule
+
+- Use `DISPLAY=:10 agent-browser --headed ...` for normal interactive sessions.
+- Keep headed mode for auth flows, form-heavy tasks, debugging, and any task where Alyosha may remote in to take over.
+- Headless is acceptable for non-interactive extraction or fast screenshot tasks.
+- If `DISPLAY=:10` fails, report it clearly.
+- Only use another display if it is actually verified.
+- Otherwise fall back to headless and note that the browser will not be visible in XRDP.
+
 ## Local Notes
 
 - This file is a vendored/adapted copy of the upstream `agent-browser` skill, with registry-compatible frontmatter.
+- This machine's default browser automation mode is headed.
+- The preferred XRDP/LXQt display is `:10`.
+- Normal interactive browsing should prefer `DISPLAY=:10 agent-browser --headed ...`.
 - Fresh local verification is summarized in `verification.md`, including the installed version, bootstrap status, the re-checked command and flag subset, a smoke test, and headed-mode viability notes for this environment.
 - Broader sections below are preserved as upstream reference content. If a workflow depends on a command or flag outside the locally re-verified subset, confirm it against local help or the upstream docs before relying on it.
 - This registry copy does not vendor the upstream companion `references/...` or `templates/...` files; use inline guidance here plus `agent-browser --help` for command details that need reconfirmation.
