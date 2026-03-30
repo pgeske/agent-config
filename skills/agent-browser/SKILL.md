@@ -10,19 +10,25 @@ dependencies: []
 
 ## Local Display Rule
 
-- Use `DISPLAY=:10 agent-browser --headed ...` for normal interactive sessions.
-- Keep headed mode for auth flows, form-heavy tasks, debugging, and any task where Alyosha may remote in to take over.
-- Headless is acceptable for non-interactive extraction or fast screenshot tasks.
-- If `DISPLAY=:10` fails, report it clearly.
-- Only use another display if it is actually verified.
-- Otherwise fall back to headless and note that the browser will not be visible in XRDP.
+**Always use `--auto-connect`.** A real Google Chrome instance runs persistently on this machine without automation flags, listening on port 9222. This avoids CAPTCHA detection and allows Google account sign-in.
+
+```bash
+# correct - connects to real Chrome, no automation flags
+agent-browser --auto-connect open <url>
+
+# fallback only if Chrome is not running (will hit CAPTCHAs, Google sign-in blocked)
+DISPLAY=:10 agent-browser --headed open <url>
+```
+
+- Chrome autostarted via `~/.config/autostart/agent-browser-chrome.desktop` on every LXQt login.
+- Profile: `~/.agent-browser/agent-profile` / `Profile 2` — persists logins across sessions.
+- If `--auto-connect` fails, warn Alyosha that Chrome may not be running before falling back.
 
 ## Local Notes
 
 - This file is a vendored/adapted copy of the upstream `agent-browser` skill, with registry-compatible frontmatter.
-- This machine's default browser automation mode is headed.
-- The preferred XRDP/LXQt display is `:10`.
-- Normal interactive browsing should prefer `DISPLAY=:10 agent-browser --headed ...`.
+- agent-browser uses Google Chrome (`/usr/bin/google-chrome`) via `~/.agent-browser/config.json`.
+- `--auto-connect` is the default on this machine — do not use `--headed` unless Chrome is confirmed down.
 - Fresh local verification is summarized in `verification.md`, including the installed version, bootstrap status, the re-checked command and flag subset, a smoke test, and headed-mode viability notes for this environment.
 - Broader sections below are preserved as upstream reference content. If a workflow depends on a command or flag outside the locally re-verified subset, confirm it against local help or the upstream docs before relying on it.
 - This registry copy does not vendor the upstream companion `references/...` or `templates/...` files; use inline guidance here plus `agent-browser --help` for command details that need reconfirmation.
