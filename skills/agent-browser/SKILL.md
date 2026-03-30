@@ -12,6 +12,18 @@ dependencies: []
 
 **Always use `--auto-connect`.** A real Google Chrome instance runs persistently on this machine without automation flags, listening on port 9222. This avoids CAPTCHA detection and allows Google account sign-in.
 
+## Confirmation Required Before Destructive Actions
+
+**Always pause and confirm with Alyosha before taking any irreversible or consequential browser action.** This includes but is not limited to:
+
+- Submitting any form
+- Clicking confirm, continue, or proceed on a purchase or payment
+- Cancelling or modifying a subscription
+- Deleting anything
+- Clicking any button that cannot be undone
+
+The confirmation should be explicit — describe exactly what you are about to do and wait for a clear "yes" or "go ahead" before proceeding. Do not infer permission from a prior instruction. If Alyosha already said "go for it" in the same turn, that counts — but when in doubt, ask.
+
 ```bash
 # correct - connects to real Chrome, no automation flags
 agent-browser --auto-connect open <url>
