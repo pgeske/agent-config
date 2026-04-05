@@ -1,33 +1,34 @@
-# Skill Registry
+# Agent Config
 
-Shared skills and utilities for agents.
+Shared agent configuration and reusable skills.
 
 ## Structure
 
+- `AGENTS.md` - Shared instructions source installed into `~/.config/opencode/AGENTS.md`
 - `skills/` - Reusable skills and capabilities
-- `shared/` - Common utilities and types
 
 ## Usage
 
 ### Source of truth
 
-Create/edit skills only in this repo:
+Create and edit shared agent config only in this repo:
 
-- `~/projects/skill-registry/skills/<skill-name>`
+- `~/projects/agent-config/AGENTS.md`
+- `~/projects/agent-config/skills/<skill-name>`
 
 ### Tooling
 
-- Install skills to all configured targets:
+- Install managed config and all skills:
   - `./install.sh`
-- Install one or more named skills:
+- Install managed config plus one or more named skills:
   - `./install.sh my-skill another-skill`
-- Replace mismatched entries for symlink-based targets:
+- Replace mismatched managed targets:
   - `./install.sh --force`
-- Remove stale registry-managed links while installing:
+- Remove stale agent-config-managed skill links while installing:
   - `./install.sh --prune`
 
-OpenClaw targets are installed as copied directories, not symlinks, so rerunning `./install.sh` overwrites existing skill copies there automatically.
+OpenClaw skill targets are installed as copied directories, not symlinks, so rerunning `./install.sh` overwrites existing skill copies there automatically.
 
 ### Target config
 
-Edit `targets.yaml` for destination directories (OpenClaw/Opencode/Codex).
+Edit `targets.yaml` for skill destination directories. The shared OpenCode `AGENTS.md` target is managed directly by `install.sh`.
