@@ -84,10 +84,27 @@ test_existing_unmanaged_agents_file_requires_force() (
     "$ROOT_DIR/AGENTS.md"
 )
 
+test_force_replaces_stale_target_root_symlink() (
+  local home_dir
+
+  home_dir=$(mktemp -d)
+  trap 'rm -rf "$home_dir"' EXIT
+
+  mkdir -p "$home_dir/.opencode"
+  ln -s "$home_dir/old-skill-registry/skills" "$home_dir/.opencode/skills"
+
+  run_install "$home_dir" --force >/dev/null
+
+  assert_symlink_target \
+    "$home_dir/.opencode/skills" \
+    "$ROOT_DIR/skills"
+ )
+
 main() {
   test_install_all_creates_opencode_agents_symlink
   test_named_skill_install_still_installs_agents
   test_existing_unmanaged_agents_file_requires_force
+  test_force_replaces_stale_target_root_symlink
   printf 'all installer checks passed\n'
 }
 

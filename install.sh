@@ -205,10 +205,20 @@ for target in "${targets[@]}"; do
     resolved_target=$(readlink -f "$target" || true)
   fi
 
-  if [[ "$install_mode" == "symlink" && "$resolved_target" == "$skills_root" ]]; then
-    printf '  = target already points to registry skills (%s -> %s); skipping\n' "$target" "$skills_root"
-    skipped=$((skipped + ${#skills[@]}))
-    continue
+  if [[ "$install_mode" == "symlink" && -L "$target" ]]; then
+    if [[ "$resolved_target" == "$skills_root" ]]; then
+      printf '  = target already points to registry skills (%s -> %s); skipping\n' "$target" "$skills_root"
+      skipped=$((skipped + ${#skills[@]}))
+      continue
+    fi
+
+    if [[ $force -eq 1 ]]; then
+      rm -rf "$target"
+      ln -s "$skills_root" "$target"
+      printf '  linked %s -> %s\n' "$target" "$skills_root"
+      updated=$((updated + 1))
+      continue
+    fi
   fi
 
   mkdir -p "$target"
