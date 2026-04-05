@@ -8,6 +8,8 @@ description: Create and maintain shared local skills from ~/projects/skill-regis
 ## Source of truth
 
 - Create and edit skills only in `~/projects/skill-registry/skills/<skill-name>`.
+- Commit skill changes in `~/projects/skill-registry`; do not commit generated installed copies from agent-specific folders.
+- Push the branch from `~/projects/skill-registry` directly when you want the skill shared, unless your human partner explicitly asks for a PR workflow.
 - Do not edit installed copies in agent-specific folders.
 - Keep the repo minimal: create the skill directory and `SKILL.md` directly instead of using helper scaffolding scripts.
 
@@ -17,6 +19,13 @@ description: Create and maintain shared local skills from ~/projects/skill-regis
 2. Add `~/projects/skill-registry/skills/<skill-name>/SKILL.md` with frontmatter and instructions.
 3. Add any skill-local helpers under that skill directory if needed.
 4. Run `~/projects/skill-registry/install.sh <skill-name>`.
+
+## Commit and push
+
+1. Review the diff in `~/projects/skill-registry`.
+2. Commit the skill change in `~/projects/skill-registry`.
+3. Push that branch directly from `~/projects/skill-registry` unless your human partner asks for a different flow.
+4. Never commit installed copies from `~/.openclaw/workspace/skills`, `~/.opencode/skills`, `~/.config/opencode/skills`, or `~/.codex/skills`.
 
 ## Install
 
