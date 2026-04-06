@@ -9,6 +9,16 @@ run_install() {
   HOME="$home_dir" bash "$ROOT_DIR/install.sh" "$@"
 }
 
+assert_no_matches() {
+  local pattern="$1"
+  shift
+
+  if rg -n --hidden --glob '!.git/**' "$pattern" "$@"; then
+    printf 'unexpected matches for pattern %s\n' "$pattern" >&2
+    return 1
+  fi
+}
+
 assert_symlink_target() {
   local path="$1"
   local expected="$2"
@@ -51,6 +61,48 @@ test_named_skill_install_still_installs_agents() (
   assert_symlink_target \
     "$home_dir/.config/opencode/skills/testskill" \
     "$ROOT_DIR/skills/testskill"
+)
+
+test_named_development_workflow_stack_installs_skills() (
+  local home_dir
+
+  home_dir=$(mktemp -d)
+  trap 'rm -rf "$home_dir"' EXIT
+
+  run_install "$home_dir" \
+    development-workflow \
+    requirements-clarity \
+    git-worktree \
+    tdd-red-green-refactor \
+    final-code-review
+
+  assert_symlink_target \
+    "$home_dir/.config/opencode/skills/development-workflow" \
+    "$ROOT_DIR/skills/development-workflow"
+
+  assert_symlink_target \
+    "$home_dir/.config/opencode/skills/requirements-clarity" \
+    "$ROOT_DIR/skills/requirements-clarity"
+
+  assert_symlink_target \
+    "$home_dir/.config/opencode/skills/git-worktree" \
+    "$ROOT_DIR/skills/git-worktree"
+
+  assert_symlink_target \
+    "$home_dir/.config/opencode/skills/tdd-red-green-refactor" \
+    "$ROOT_DIR/skills/tdd-red-green-refactor"
+
+  assert_symlink_target \
+    "$home_dir/.config/opencode/skills/final-code-review" \
+    "$ROOT_DIR/skills/final-code-review"
+)
+
+test_managed_files_do_not_reference_legacy_plugin() (
+  assert_no_matches 'super''powers' \
+    "$ROOT_DIR/AGENTS.md" \
+    "$ROOT_DIR/install.sh" \
+    "$ROOT_DIR/targets.yaml" \
+    "$ROOT_DIR/skills"
 )
 
 test_existing_unmanaged_agents_file_requires_force() (
@@ -103,8 +155,10 @@ test_force_replaces_stale_target_root_symlink() (
 main() {
   test_install_all_creates_opencode_agents_symlink
   test_named_skill_install_still_installs_agents
+  test_named_development_workflow_stack_installs_skills
   test_existing_unmanaged_agents_file_requires_force
   test_force_replaces_stale_target_root_symlink
+  test_managed_files_do_not_reference_legacy_plugin
   printf 'all installer checks passed\n'
 }
 
