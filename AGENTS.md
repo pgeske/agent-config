@@ -29,3 +29,6 @@ The user needs short, scannable responses. Follow these rules strictly:
 
 - Use the `development-workflow` skill for non-trivial implementation work such as features, bug fixes, behavior changes, multi-file edits, or work that should probably have tests.
 - Skip that workflow for docs-only, comments-only, formatting-only, rename-only, or other low-risk mechanical edits.
+- Use the `gather-context` skill before broad searches when the request may depend on shell history, notes, or repos outside the current workspace.
+- For command requests, check shell history before help pages or web docs when prior local usage is plausible.
+- For private or project-specific questions, prefer targeted notes and repo resolution over broad home-directory search or public web lookup.

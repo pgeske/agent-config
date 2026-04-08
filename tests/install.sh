@@ -97,6 +97,23 @@ test_named_development_workflow_stack_installs_skills() (
     "$ROOT_DIR/skills/final-code-review"
 )
 
+test_named_gather_context_install_still_installs_agents() (
+  local home_dir
+
+  home_dir=$(mktemp -d)
+  trap 'rm -rf "$home_dir"' EXIT
+
+  run_install "$home_dir" gather-context
+
+  assert_symlink_target \
+    "$home_dir/.config/opencode/AGENTS.md" \
+    "$ROOT_DIR/AGENTS.md"
+
+  assert_symlink_target \
+    "$home_dir/.config/opencode/skills/gather-context" \
+    "$ROOT_DIR/skills/gather-context"
+)
+
 test_managed_files_do_not_reference_legacy_plugin() (
   assert_no_matches 'super''powers' \
     "$ROOT_DIR/AGENTS.md" \
@@ -156,6 +173,7 @@ main() {
   test_install_all_creates_opencode_agents_symlink
   test_named_skill_install_still_installs_agents
   test_named_development_workflow_stack_installs_skills
+  test_named_gather_context_install_still_installs_agents
   test_existing_unmanaged_agents_file_requires_force
   test_force_replaces_stale_target_root_symlink
   test_managed_files_do_not_reference_legacy_plugin
