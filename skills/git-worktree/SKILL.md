@@ -41,6 +41,7 @@ Do not use this skill for:
 1. Detect the repo root and project name.
 2. Choose the worktree location using the priority rules.
 3. Create a branch with a clear task-oriented name.
+   - Use the prefix `alyosha/` unless the user explicitly asked for a different branch name.
 4. Create the worktree.
 5. Run lightweight project setup if needed.
 6. Run a relevant baseline verification command before implementation.
