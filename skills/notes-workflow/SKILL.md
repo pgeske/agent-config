@@ -8,14 +8,16 @@ description: Create markdown notes in the current user's home notes folder. Use 
 ## When to use
 
 - Use this skill when the user asks you to create a note, save notes, write something down, or capture information in a note file.
-- Do not use this skill for persistent task or todo management in `~/notes/tasks.md`; prefer `tasks-workflow` for that.
+- Do not use this skill for persistent task or todo management in `~/notes/wiki/tasks.md`; prefer `tasks-workflow` for that.
 
 ## Default location
 
 - The default note location is the current user's home notes folder.
-- Assume `~/Notes` unless the user says otherwise.
-- If `~/Notes` does not exist but `~/notes` does, use `~/notes` as the existing notes folder without asking.
-- If neither exists and the user did not specify a path, create `~/Notes` and place the note there.
+- Use `~/notes` unless the user says otherwise.
+- If `~/notes` does not exist and the user did not specify a path, create `~/notes` and place the note there.
+- If the notes root contains `AGENTS.md` plus `raw/` and `wiki/`, treat it as a second-brain vault.
+- In a second-brain vault, default rough note capture to `raw/captures/` unless the user explicitly asks for a polished wiki page or a different destination.
+- In a second-brain vault, default to same-turn wiki filing after capture unless the user explicitly asks for raw-only storage.
 
 ## File format
 
@@ -39,3 +41,6 @@ description: Create markdown notes in the current user's home notes folder. Use 
 - If they only give a topic, infer a sensible title and filename.
 - After creating the note, tell the user the final path.
 - If updating an existing note is more appropriate than creating a new one, prefer the existing note when the user's request clearly points to it.
+- In a second-brain vault, keep captures close to the source material instead of over-organizing them.
+- If the user asks to organize, file, link, ingest, or update the knowledge base, prefer the `wiki-maintainer` skill after capture.
+- In a second-brain vault, if a newly created capture contains durable information and the user did not ask for raw-only storage, invoke `wiki-maintainer` in the same turn.

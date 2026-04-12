@@ -1,6 +1,6 @@
 ---
 name: memo
-description: Turn pasted voice memo or rough transcription text into a clean, organized markdown note in `~/notes/memos`. Use when the user shares dictated transcript text, rambly spoken notes, or asks to distill a voice memo into a note.
+description: Turn pasted voice memo or rough transcription text into a clean source note in `~/notes/raw/captures/memos`. Use when the user shares dictated transcript text, rambly spoken notes, or asks to distill a voice memo into a note.
 version: "0.1.1"
 author: alyosha
 dependencies:
@@ -35,11 +35,12 @@ Convert messy spoken transcription into a concise, structured note that is easy 
 5. If a section has no meaningful content, omit it rather than adding empty placeholders.
 6. Treat this as light extraction only: capture likely actions, ideas, questions, and important points, but do not try to do heavy routing like deduping tasks across memos, writing to long-term memory, assigning priorities, or deciding calendar/todo placement.
 7. If parts of the transcript are unclear or contradictory, keep the note useful and briefly mark uncertain points instead of guessing.
-8. Save memo notes in `~/notes/memos` instead of the general notes root.
-9. If `~/notes/memos` does not exist yet, create it before saving the note.
-10. Create the final note via `notes-workflow`, but override its default location so the file is written to `~/notes/memos`; still follow that skill's rules for tags, filename, and final path reporting.
+8. Save memo notes in `~/notes/raw/captures/memos` instead of the general notes root.
+9. If `~/notes/raw/captures/memos` does not exist yet, create it before saving the note.
+10. Create the final note via `notes-workflow`, but override its default location so the file is written to `~/notes/raw/captures/memos`; still follow that skill's rules for tags, filename, and final path reporting.
 11. By default, append the original transcript at the end of the note in a `## Raw Transcript` section so the cleaned summary and source text live together.
 12. If multiple transcript files are provided for one memo, combine them into a single note and preserve all of their raw text in the `## Raw Transcript` section with light separators or subheadings when helpful.
+13. Unless the user explicitly asks for raw-only storage, follow memo capture with `wiki-maintainer` in the same turn so durable themes get merged into the wiki promptly.
 
 ## Output style
 

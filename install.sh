@@ -4,12 +4,14 @@ set -euo pipefail
 ROOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 SKILLS_DIR="$ROOT_DIR/skills"
 TARGETS_FILE="$ROOT_DIR/targets.yaml"
+AGENTS_SOURCE="$ROOT_DIR/AGENTS.md"
+AGENTS_TARGET_RAW="~/.config/opencode/AGENTS.md"
 
 usage() {
   cat <<'EOF'
 Usage: ./install.sh [--force] [--prune] [skill ...]
 
-Install registry-managed skills into all configured targets.
+Install managed skills and shared agent config.
 
 Options:
   --force  Replace existing files or directories for symlink-based targets
@@ -154,6 +156,38 @@ contains_skill() {
   return 1
 }
 
+install_managed_symlink() {
+  local src="$1"
+  local dst="$2"
+
+  mkdir -p "$(dirname "$dst")"
+
+  if [[ -e "$dst" || -L "$dst" ]]; then
+    if [[ -L "$dst" ]] && [[ $(readlink -f "$dst" || true) == "$src" ]]; then
+      skipped=$((skipped + 1))
+      return 0
+    fi
+
+    if [[ $force -ne 1 ]]; then
+      printf '  ! exists (use --force to replace): %s\n' "$dst"
+      return 2
+    fi
+
+    rm -rf "$dst"
+    updated=$((updated + 1))
+  else
+    created=$((created + 1))
+  fi
+
+  ln -s "$src" "$dst"
+  printf '  linked %s -> %s\n' "$dst" "$src"
+}
+
+if [[ ! -f "$AGENTS_SOURCE" ]]; then
+  printf 'Missing shared AGENTS.md: %s\n' "$AGENTS_SOURCE" >&2
+  exit 1
+fi
+
 created=0
 updated=0
 skipped=0
@@ -171,10 +205,20 @@ for target in "${targets[@]}"; do
     resolved_target=$(readlink -f "$target" || true)
   fi
 
-  if [[ "$install_mode" == "symlink" && "$resolved_target" == "$skills_root" ]]; then
-    printf '  = target already points to registry skills (%s -> %s); skipping\n' "$target" "$skills_root"
-    skipped=$((skipped + ${#skills[@]}))
-    continue
+  if [[ "$install_mode" == "symlink" && -L "$target" ]]; then
+    if [[ "$resolved_target" == "$skills_root" ]]; then
+      printf '  = target already points to registry skills (%s -> %s); skipping\n' "$target" "$skills_root"
+      skipped=$((skipped + ${#skills[@]}))
+      continue
+    fi
+
+    if [[ $force -eq 1 ]]; then
+      rm -rf "$target"
+      ln -s "$skills_root" "$target"
+      printf '  linked %s -> %s\n' "$target" "$skills_root"
+      updated=$((updated + 1))
+      continue
+    fi
   fi
 
   mkdir -p "$target"
@@ -232,5 +276,12 @@ for target in "${targets[@]}"; do
     fi
   done
 done
+
+agents_target=$(expand_path "$AGENTS_TARGET_RAW")
+
+printf '\n==> %s\n' "$agents_target"
+if ! install_managed_symlink "$AGENTS_SOURCE" "$agents_target"; then
+  exit 1
+fi
 
 printf '\nDone. created=%s updated=%s skipped=%s\n' "$created" "$updated" "$skipped"
