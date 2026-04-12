@@ -8,7 +8,7 @@ description: Create markdown notes in the current user's home notes folder. Use 
 ## When to use
 
 - Use this skill when the user asks you to create a note, save notes, write something down, or capture information in a note file.
-- Do not use this skill for persistent task or todo management in `~/notes/tasks.md`; prefer `tasks-workflow` for that.
+- Do not use this skill for persistent task or todo management in `~/notes/wiki/tasks.md`; prefer `tasks-workflow` for that.
 
 ## Default location
 

@@ -1,6 +1,6 @@
 ---
 name: tasks-workflow
-description: Read and manage persistent personal tasks in `~/notes/tasks.md`. Use when the user asks to add, complete, update, remove, inspect, or summarize tasks or todos.
+description: Read and manage persistent personal tasks in `~/notes/wiki/tasks.md`. Use when the user asks to add, complete, update, remove, inspect, or summarize tasks or todos.
 version: "0.2.0"
 author: alyosha
 ---
@@ -16,16 +16,16 @@ author: alyosha
 
 ## Source of truth
 
-- The source of truth is `~/notes/tasks.md`.
+- The source of truth is `~/notes/wiki/tasks.md`.
 - Always read the current file before answering questions about tasks or modifying it.
-- If `~/notes/tasks.md` does not exist, create it with the canonical structure described below.
+- If `~/notes/wiki/tasks.md` does not exist, create it with the canonical structure described below.
 - Treat the existing file as user-owned state: preserve useful wording, tags, and completed history unless the user's request clearly changes them.
 
 ## Scope
 
 - This file is for personal tasks only.
 - Do not add employer or job-related tasks by default; the user manages work todos elsewhere.
-- Only put a work task in `~/notes/tasks.md` if the user explicitly overrides that rule.
+- Only put a work task in `~/notes/wiki/tasks.md` if the user explicitly overrides that rule.
 
 ## Canonical structure
 
@@ -64,7 +64,7 @@ author: alyosha
 - When adding a new task, always include both a priority emoji and `created` metadata.
 - When completing, moving, or rewording a task, preserve its original `created` metadata unless the user explicitly wants it reset.
 - Reorder tasks only when it materially improves clarity or matches the user's request.
-- If the user asks for a summary instead of an edit, read from `~/notes/tasks.md` and summarize the relevant sections rather than rewriting the file.
+- If the user asks for a summary instead of an edit, read from `~/notes/wiki/tasks.md` and summarize the relevant sections rather than rewriting the file.
 
 ## Default file template
 
@@ -90,4 +90,4 @@ If the file must be created from scratch, use this structure:
 ## After changes
 
 - Tell the user what changed.
-- Reference `~/notes/tasks.md` in the response.
+- Reference `~/notes/wiki/tasks.md` in the response.

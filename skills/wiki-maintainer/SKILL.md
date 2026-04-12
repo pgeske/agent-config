@@ -22,7 +22,7 @@ description: Compile raw captures and legacy notes into a linked wiki in the use
 - `raw/` is immutable source material.
 - `raw/legacy/` stores migrated legacy notes and older memo material until compiled.
 - `raw/archive/` stores raw notes that should remain available but are no longer in the active migration backlog.
-- `tasks.md`, `shopping.md`, and `Home.md` are normal vault files and may be linked from the wiki index when relevant.
+- `wiki/tasks.md` and `wiki/shopping.md` are operational wiki files and may be linked from the wiki index when relevant.
 - Prefer updating existing wiki pages over creating duplicates.
 - Always update `wiki/index.md` and `wiki/log.md` when the wiki changes.
 - Treat graph quality as part of correctness, not optional polish.
