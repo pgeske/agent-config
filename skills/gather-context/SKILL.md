@@ -40,9 +40,12 @@ Use this skill to choose the fastest, highest-signal context sources before fall
 ### Personal, private, or project-memory questions
 
 - Search the notes vault first.
+- If the notes vault contains `AGENTS.md` and `wiki/index.md`, read those first and treat `wiki/index.md` as the entry point.
+- In second-brain vaults, prefer wiki navigation before broad note search.
 - Use `python3 scripts/notes_search.py "<query>" --json`.
 - Narrow with tags when useful, for example `--tag obsidian` or `--tag work`.
 - Prefer notes over the public web when the answer could reasonably live in a memo, daily note, or project note.
+- Use broad note search as fallback when the wiki index does not surface the answer or when you need unmigrated raw or legacy material.
 
 ### Code and repository questions
 
@@ -74,7 +77,7 @@ Use this skill to choose the fastest, highest-signal context sources before fall
 ## Defaults
 
 - Shell history files: `~/.zsh_history`, `~/.bash_history`, `~/.zhistory`, `~/.histfile`
-- Notes root: prefer `~/Notes`, else `~/notes`
+- Notes root: `~/notes`
 - Local repos root: `~/projects`
 
 ## Examples

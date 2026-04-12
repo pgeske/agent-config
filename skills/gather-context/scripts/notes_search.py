@@ -9,6 +9,7 @@ from pathlib import Path
 SKIP_DIRS = {".git", ".obsidian", ".sisyphus", ".trash"}
 TEXT_SUFFIXES = {".md", ".txt", ".text"}
 MATCH_SCORES = {
+    "entrypoint": 130,
     "title": 120,
     "alias": 110,
     "filename": 100,
@@ -16,6 +17,8 @@ MATCH_SCORES = {
     "path": 80,
     "content": 70,
 }
+ENTRYPOINT_PATHS = {"AGENTS.md", "wiki/index.md", "wiki/log.md"}
+ENTRYPOINT_PRIORITY = {"wiki/index.md": 3, "AGENTS.md": 2, "wiki/log.md": 1}
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,12 +35,7 @@ def detect_notes_root(notes_root: str | None) -> Path:
     if notes_root:
         return Path(notes_root).expanduser()
 
-    home = Path.home()
-    preferred = home / "Notes"
-    fallback = home / "notes"
-    if preferred.is_dir():
-        return preferred
-    return fallback
+    return Path.home() / "notes"
 
 
 def normalize_tag(tag: str) -> str:
@@ -124,7 +122,7 @@ def find_inline_tags(lines: list[str], start_index: int) -> list[tuple[int, str]
     return tags
 
 
-def append_match(matches: list[dict[str, object]], seen: set[tuple[str, str, int | None, str]], *, path: Path, match_type: str, text: str, line_number: int | None = None) -> None:
+def append_match(matches: list[dict[str, object]], seen: set[tuple[str, str, int | None, str]], *, path: Path, match_type: str, text: str, line_number: int | None = None, priority: int = 0) -> None:
     key = (str(path), match_type, line_number, text)
     if key in seen:
         return
@@ -136,6 +134,7 @@ def append_match(matches: list[dict[str, object]], seen: set[tuple[str, str, int
             "line": text,
             "match_type": match_type,
             "score": MATCH_SCORES[match_type],
+            "priority": priority,
         }
     )
 
@@ -166,28 +165,30 @@ def search_notes(root: Path, query: str, tags: list[str], limit: int) -> list[di
             continue
 
         relative_path = str(path.relative_to(root))
+        is_entrypoint = relative_path in ENTRYPOINT_PATHS
+        entrypoint_priority = ENTRYPOINT_PRIORITY.get(relative_path, 0)
         lines = text.splitlines()
         frontmatter, body_start = parse_frontmatter(lines)
 
         if query_matches(query, path.name):
-            append_match(matches, seen, path=path, match_type="filename", text=path.name)
+            append_match(matches, seen, path=path, match_type="entrypoint" if is_entrypoint else "filename", text=path.name, priority=entrypoint_priority)
 
         if query_matches(query, relative_path):
-            append_match(matches, seen, path=path, match_type="path", text=relative_path)
+            append_match(matches, seen, path=path, match_type="entrypoint" if is_entrypoint else "path", text=relative_path, priority=entrypoint_priority)
 
         title_line, title = find_title(lines, body_start)
         if title and query_matches(query, title):
-            append_match(matches, seen, path=path, match_type="title", text=f"# {title}", line_number=title_line)
+            append_match(matches, seen, path=path, match_type="entrypoint" if is_entrypoint else "title", text=f"# {title}", line_number=title_line, priority=entrypoint_priority)
 
         for alias in frontmatter.get("aliases", []) + frontmatter.get("alias", []):
             if query_matches(query, alias):
-                append_match(matches, seen, path=path, match_type="alias", text=alias)
+                append_match(matches, seen, path=path, match_type="alias", text=alias, priority=entrypoint_priority)
 
         frontmatter_tags = frontmatter.get("tags", []) + frontmatter.get("tag", [])
         inline_tags = [tag for _, tag in find_inline_tags(lines, body_start)]
         for tag in frontmatter_tags + inline_tags:
             if query_matches(query, tag):
-                append_match(matches, seen, path=path, match_type="tag", text=tag)
+                append_match(matches, seen, path=path, match_type="tag", text=tag, priority=entrypoint_priority)
 
         for line_number, line in enumerate(lines[body_start:], start=body_start + 1):
             stripped = line.strip()
@@ -197,9 +198,9 @@ def search_notes(root: Path, query: str, tags: list[str], limit: int) -> list[di
                 continue
             if not query_matches(query, stripped):
                 continue
-            append_match(matches, seen, path=path, match_type="content", text=stripped, line_number=line_number)
+            append_match(matches, seen, path=path, match_type="entrypoint" if is_entrypoint else "content", text=stripped, line_number=line_number, priority=entrypoint_priority)
 
-    matches.sort(key=lambda item: (-int(item["score"]), str(item["path"]), int(item["line_number"] or 0)))
+    matches.sort(key=lambda item: (-int(item["score"]), -int(item.get("priority", 0)), str(item["path"]), int(item["line_number"] or 0)))
     return matches[: max(limit, 0)]
 
 

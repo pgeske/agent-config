@@ -71,7 +71,7 @@ author: alyosha
 If the file must be created from scratch, use this structure:
 
 ```md
-<!-- Reconciled from ~/notes/memos and the existing tasks file. Manual edits are allowed; future runs will reconcile them. -->
+<!-- Managed task list. Manual edits are allowed. -->
 
 # Tasks
 
