@@ -10,6 +10,7 @@ description: Compile raw captures and legacy notes into a linked wiki in the use
 - Use this skill when the user asks to organize notes, ingest recent captures, file something into the wiki, link notes together, or update the knowledge base.
 - Use it after rough capture when the user wants durable knowledge instead of just a saved source note.
 - In a second-brain vault, it is the default follow-up after capture unless the user asked for raw-only storage.
+- Treat this skill as the only workflow that promotes information from `raw/` into `wiki/`.
 
 ## Vault assumptions
 
@@ -22,6 +23,7 @@ description: Compile raw captures and legacy notes into a linked wiki in the use
 - `raw/` is immutable source material.
 - `raw/legacy/` stores migrated legacy notes and older memo material until compiled.
 - `raw/archive/` stores raw notes that should remain available but are no longer in the active migration backlog.
+- Do not rewrite or replace the raw capture; compile from it into wiki pages.
 - `wiki/tasks.md` and `wiki/shopping.md` are operational wiki files and may be linked from the wiki index when relevant.
 - Prefer updating existing wiki pages over creating duplicates.
 - Always update `wiki/index.md` and `wiki/log.md` when the wiki changes.

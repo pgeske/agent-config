@@ -1,6 +1,6 @@
 ---
 name: notes-workflow
-description: Create markdown notes in the current user's home notes folder. Use when the user asks to create a note, write something down, save a note, or capture notes unless they specify a different destination.
+description: Capture markdown notes into the current user's raw notes inbox. Use when the user asks to create a note, write something down, save a note, or capture a conversation or idea as source material.
 ---
 
 # Notes Workflow
@@ -8,7 +8,9 @@ description: Create markdown notes in the current user's home notes folder. Use 
 ## When to use
 
 - Use this skill when the user asks you to create a note, save notes, write something down, or capture information in a note file.
+- In a second-brain vault, treat this as a raw capture workflow, not a wiki editing workflow.
 - Do not use this skill for persistent task or todo management in `~/notes/wiki/tasks.md`; prefer `tasks-workflow` for that.
+- Do not use this skill to organize, file, link, ingest, or update the wiki; prefer `wiki-maintainer` for that.
 
 ## Default location
 
@@ -16,8 +18,8 @@ description: Create markdown notes in the current user's home notes folder. Use 
 - Use `~/notes` unless the user says otherwise.
 - If `~/notes` does not exist and the user did not specify a path, create `~/notes` and place the note there.
 - If the notes root contains `AGENTS.md` plus `raw/` and `wiki/`, treat it as a second-brain vault.
-- In a second-brain vault, default rough note capture to `raw/captures/` unless the user explicitly asks for a polished wiki page or a different destination.
-- In a second-brain vault, default to same-turn wiki filing after capture unless the user explicitly asks for raw-only storage.
+- In a second-brain vault, always write new captures to `raw/captures/` unless the user explicitly asks for a different raw destination.
+- Do not write directly into `wiki/` from this skill.
 
 ## File format
 
@@ -41,6 +43,7 @@ description: Create markdown notes in the current user's home notes folder. Use 
 - If they only give a topic, infer a sensible title and filename.
 - After creating the note, tell the user the final path.
 - If updating an existing note is more appropriate than creating a new one, prefer the existing note when the user's request clearly points to it.
-- In a second-brain vault, keep captures close to the source material instead of over-organizing them.
-- If the user asks to organize, file, link, ingest, or update the knowledge base, prefer the `wiki-maintainer` skill after capture.
-- In a second-brain vault, if a newly created capture contains durable information and the user did not ask for raw-only storage, invoke `wiki-maintainer` in the same turn.
+- In a second-brain vault, keep captures close to the source material and avoid heavy transformation or over-organization.
+- If the user explicitly asks to edit a wiki page, organize notes, file knowledge, or update the knowledge base, hand off to `wiki-maintainer` instead of doing that work here.
+- After creating a raw capture, invoke `wiki-maintainer` in the same turn unless the user explicitly asked for raw-only storage.
+- When handing off, pass `wiki-maintainer` the new raw note path and make clear that the raw note is the source of truth.
