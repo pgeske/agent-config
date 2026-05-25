@@ -138,6 +138,10 @@ test_install_all_installs_pi_extensions() (
     "$home_dir/.pi/agent/extensions/excalidraw.ts" \
     "$ROOT_DIR/extensions/excalidraw.ts"
 
+  assert_symlink_target \
+    "$home_dir/.pi/agent/extensions/codex-review.ts" \
+    "$ROOT_DIR/extensions/codex-review.ts"
+
   if [[ -d "$ROOT_DIR/node_modules" ]]; then
     assert_symlink_target \
       "$home_dir/.pi/agent/extensions/node_modules" \

@@ -35,6 +35,8 @@ Pi extension dependencies are managed by the root `package.json`; run `npm insta
 
 MCP bridge secrets belong in environment variables or local untracked config such as `~/.pi/agent/mcp.json`; use `.env.example` as a template only.
 
+Pi Codex review support is available through the `/codex-review` command after install. It can review the current PR/branch, uncommitted changes, a commit, or a shared GitHub PR URL; it requires the Codex CLI and GitHub CLI for PR URL mode.
+
 ### Target config
 
 Edit `targets.yaml` for skill destination directories and Pi extension destinations. Shared AGENTS targets are managed directly by `install.sh`.

@@ -143,6 +143,22 @@ const presets: Record<string, AgentPreset> = {
       "Return findings grouped as critical, important, minor, plus an overall recommendation.",
     ].join("\n"),
   },
+  "code-reviewer": {
+    name: "code-reviewer",
+    description: "Heavyweight PR, branch, commit, and risky-change code reviewer.",
+    tools: ["read", "grep", "find", "ls", "bash"],
+    writeAccess: false,
+    systemPrompt: [
+      "You are a code-reviewer subagent for Pi.",
+      "Perform high-signal code review for PRs, branches, commits, or large/risky code changes.",
+      "Do not modify files, commit, push, merge, or run destructive commands.",
+      "Prefer reviewing the actual diff against the correct base; for an open PR, determine its base with gh pr view and review against origin/<base>.",
+      "When available, use Pi's /codex-review workflow or codex exec review for non-trivial PRs or when explicitly requested.",
+      "Treat Codex output as advisory: verify every accepted finding against the real code path and reject speculative, low-impact, style-only, or over-complicated findings.",
+      "Focus on correctness, regressions, security/privacy risk, data loss, concurrency, install/runtime behavior, dependency contracts, and missing tests.",
+      "Return critical findings, important findings, minor findings, rejected findings if any, tests/commands inspected or run, and a recommendation: approve, approve after fixes, or block.",
+    ].join("\n"),
+  },
   merger: {
     name: "merger",
     description: "Integration agent for selected branches.",
@@ -169,7 +185,7 @@ const presets: Record<string, AgentPreset> = {
 const TaskSchema = Type.Object({
   name: Type.Optional(Type.String({ description: "Human-readable job label" })),
   persona: Type.Optional(Type.String({ description: "Optional friendly subagent name, e.g. Ada or Grace" })),
-  agent: Type.String({ description: "Agent preset: scout, planner, worker, tester, reviewer, merger, or generic" }),
+  agent: Type.String({ description: "Agent preset: scout, planner, worker, tester, reviewer, code-reviewer, merger, or generic" }),
   task: Type.String({ description: "Task to delegate" }),
   cwd: Type.Optional(Type.String({ description: "Working directory for this job" })),
   model: Type.Optional(Type.String({ description: "Optional Pi model selector" })),
