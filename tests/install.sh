@@ -133,6 +133,10 @@ test_install_all_installs_pi_extensions() (
   assert_symlink_target \
     "$home_dir/.pi/agent/extensions/mcp-bridge" \
     "$ROOT_DIR/extensions/mcp-bridge"
+
+  assert_symlink_target \
+    "$home_dir/.pi/agent/extensions/excalidraw.ts" \
+    "$ROOT_DIR/extensions/excalidraw.ts"
 )
 
 test_extension_conflict_requires_force() (
@@ -164,6 +168,37 @@ test_extension_conflict_requires_force() (
   assert_symlink_target \
     "$home_dir/.pi/agent/extensions/subagents" \
     "$ROOT_DIR/extensions/subagents"
+)
+
+test_extension_file_conflict_requires_force() (
+  local home_dir
+  local output
+
+  home_dir=$(mktemp -d)
+  trap 'rm -rf "$home_dir"' EXIT
+
+  mkdir -p "$home_dir/.pi/agent/extensions"
+  printf 'local-only\n' > "$home_dir/.pi/agent/extensions/excalidraw.ts"
+
+  if output=$(run_install "$home_dir" 2>&1); then
+    printf 'expected install to fail without --force\n' >&2
+    return 1
+  fi
+
+  case "$output" in
+    *"exists (use --force to replace): $home_dir/.pi/agent/extensions/excalidraw.ts"*)
+      ;;
+    *)
+      printf 'unexpected error output:\n%s\n' "$output" >&2
+      return 1
+      ;;
+  esac
+
+  run_install "$home_dir" --force >/dev/null
+
+  assert_symlink_target \
+    "$home_dir/.pi/agent/extensions/excalidraw.ts" \
+    "$ROOT_DIR/extensions/excalidraw.ts"
 )
 
 test_extension_target_root_symlink_requires_force() (
@@ -283,6 +318,7 @@ main() {
   test_named_gather_context_install_still_installs_agents
   test_install_all_installs_pi_extensions
   test_extension_conflict_requires_force
+  test_extension_file_conflict_requires_force
   test_extension_target_root_symlink_requires_force
   test_prune_removes_stale_extension_links
   test_existing_unmanaged_agents_file_requires_force

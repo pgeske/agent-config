@@ -308,23 +308,26 @@ done
 
 if [[ -d "$EXTENSIONS_DIR" && ${#extension_targets[@]} -gt 0 ]]; then
   extensions_root=$(readlink -f "$EXTENSIONS_DIR")
-  extension_dirs=()
+  extension_paths=()
   shopt -s nullglob
-  for extension_dir in "$EXTENSIONS_DIR"/*; do
-    [[ -d "$extension_dir" && -f "$extension_dir/index.ts" ]] || continue
-    extension_dirs+=("$extension_dir")
+  for extension_path in "$EXTENSIONS_DIR"/*; do
+    if [[ -d "$extension_path" && -f "$extension_path/index.ts" ]]; then
+      extension_paths+=("$extension_path")
+    elif [[ -f "$extension_path" && "$extension_path" == *.ts ]]; then
+      extension_paths+=("$extension_path")
+    fi
   done
   shopt -u nullglob
 
-  if [[ ${#extension_dirs[@]} -gt 0 ]]; then
-    printf '\nInstalling %s extension(s)\n' "${#extension_dirs[@]}"
+  if [[ ${#extension_paths[@]} -gt 0 ]]; then
+    printf '\nInstalling %s extension(s)\n' "${#extension_paths[@]}"
   fi
 
   contains_extension() {
     local needle="$1"
-    local extension_dir
-    for extension_dir in "${extension_dirs[@]}"; do
-      if [[ "$(basename "$extension_dir")" == "$needle" ]]; then
+    local extension_path
+    for extension_path in "${extension_paths[@]}"; do
+      if [[ "$(basename "$extension_path")" == "$needle" ]]; then
         return 0
       fi
     done
@@ -363,9 +366,9 @@ if [[ -d "$EXTENSIONS_DIR" && ${#extension_targets[@]} -gt 0 ]]; then
       shopt -u nullglob
     fi
 
-    for extension_dir in "${extension_dirs[@]}"; do
-      name=$(basename "$extension_dir")
-      src="$extension_dir"
+    for extension_path in "${extension_paths[@]}"; do
+      name=$(basename "$extension_path")
+      src="$extension_path"
       dst="$extension_target/$name"
 
       if [[ -e "$dst" || -L "$dst" ]]; then
