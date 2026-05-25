@@ -215,7 +215,22 @@ function runCommand(command: string, args: string[], cwd: string, timeoutMs: num
     const child = spawn(command, args, { cwd, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
+    let settled = false;
+
+    const settle = (result: RunResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (!allowFailure && result.code !== 0) {
+        reject(new Error(`${command} ${args.join(" ")} failed with exit ${result.code}: ${result.stderr || result.stdout}`));
+        return;
+      }
+      resolve(result);
+    };
+
     const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       child.kill("SIGTERM");
       reject(new Error(`${command} timed out after ${Math.round(timeoutMs / 1000)}s`));
     }, timeoutMs);
@@ -227,17 +242,11 @@ function runCommand(command: string, args: string[], cwd: string, timeoutMs: num
       stderr += chunk.toString();
     });
     child.on("error", (error) => {
-      clearTimeout(timer);
-      reject(error);
+      const message = error instanceof Error ? error.message : String(error);
+      settle({ code: 1, stdout, stderr: stderr || message });
     });
     child.on("close", (code) => {
-      clearTimeout(timer);
-      const result = { code: code ?? 1, stdout, stderr };
-      if (!allowFailure && result.code !== 0) {
-        reject(new Error(`${command} ${args.join(" ")} failed with exit ${result.code}: ${stderr || stdout}`));
-        return;
-      }
-      resolve(result);
+      settle({ code: code ?? 1, stdout, stderr });
     });
   });
 }
