@@ -87,7 +87,7 @@ const presets: Record<string, AgentPreset> = {
   scout: {
     name: "scout",
     description: "Fast read-only codebase reconnaissance.",
-    tools: ["read", "grep", "find", "ls", "bash"],
+    tools: ["read", "grep", "find", "ls"],
     writeAccess: false,
     systemPrompt: [
       "You are a scout subagent for Pi.",
@@ -123,9 +123,10 @@ const presets: Record<string, AgentPreset> = {
     name: "tester",
     description: "Verification and test diagnosis agent.",
     tools: ["read", "grep", "find", "ls", "bash"],
-    writeAccess: false,
+    writeAccess: true,
     systemPrompt: [
       "You are a tester subagent for Pi.",
+      "Run tests in your isolated git worktree so shell commands cannot mutate the parent checkout.",
       "Run or inspect relevant verification for the delegated work.",
       "Do not modify files unless explicitly instructed.",
       "Return pass/fail status, commands run, failure diagnostics, and recommended fixes.",
@@ -134,7 +135,7 @@ const presets: Record<string, AgentPreset> = {
   reviewer: {
     name: "reviewer",
     description: "Read-only code and requirements reviewer.",
-    tools: ["read", "grep", "find", "ls", "bash"],
+    tools: ["read", "grep", "find", "ls"],
     writeAccess: false,
     systemPrompt: [
       "You are a reviewer subagent for Pi.",
@@ -147,11 +148,11 @@ const presets: Record<string, AgentPreset> = {
     name: "code-reviewer",
     description: "Heavyweight PR, branch, commit, and risky-change code reviewer.",
     tools: ["read", "grep", "find", "ls", "bash"],
-    writeAccess: false,
+    writeAccess: true,
     systemPrompt: [
       "You are a code-reviewer subagent for Pi.",
-      "Perform high-signal code review for PRs, branches, commits, or large/risky code changes.",
-      "Do not modify files, commit, push, merge, or run destructive commands.",
+      "Perform high-signal code review for PRs, branches, commits, or large/risky code changes in your isolated git worktree.",
+      "Do not modify files intentionally, commit, push, merge, or run destructive commands.",
       "Prefer reviewing the actual diff against the correct base; for an open PR, determine its base with gh pr view and review against origin/<base>.",
       "When available, use Pi's /codex-review workflow or codex exec review for non-trivial PRs or when explicitly requested.",
       "Treat Codex output as advisory: verify every accepted finding against the real code path and reject speculative, low-impact, style-only, or over-complicated findings.",
