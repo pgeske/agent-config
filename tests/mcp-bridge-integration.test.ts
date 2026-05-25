@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 
-import { connectServer, normalizeMcpContent } from "../extensions/mcp-bridge/index.ts";
+import { McpToolError, connectServer, mcpToolResultToPiToolResult, normalizeMcpContent } from "../extensions/mcp-bridge/index.ts";
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
@@ -28,6 +28,18 @@ describe("mcp-bridge integration", () => {
         async ({ name }) => ({
           content: [{ type: "text", text: `Hello, ${name}!` }],
           structuredContent: { greeted: name },
+        }),
+      );
+      mcpServer.registerTool(
+        "fail",
+        {
+          description: "Return an MCP tool error response",
+          inputSchema: { reason: z.string() },
+        },
+        async ({ reason }) => ({
+          isError: true,
+          content: [{ type: "text", text: `Failed: ${reason}` }],
+          structuredContent: { reason },
         }),
       );
       return mcpServer;
@@ -66,8 +78,11 @@ describe("mcp-bridge integration", () => {
         name: "test",
         url: `http://127.0.0.1:${address.port}/mcp`,
       });
-      assert.equal(connection.tools.length, 1);
-      assert.equal(connection.tools[0]?.name, "greet");
+      assert.equal(connection.tools.length, 2);
+      assert.deepEqual(
+        connection.tools.map((tool) => tool.name).sort(),
+        ["fail", "greet"],
+      );
 
       const result = await connection.client.callTool({
         name: "greet",
@@ -78,6 +93,21 @@ describe("mcp-bridge integration", () => {
         { type: "text", text: "Hello, Pi!" },
         { type: "text", text: 'Structured content:\n{"greeted":"Pi"}' },
       ]);
+
+      const errorResult = await connection.client.callTool({
+        name: "fail",
+        arguments: { reason: "bad shape" },
+      });
+
+      assert.throws(
+        () => mcpToolResultToPiToolResult("test", "fail", errorResult),
+        (error) => {
+          assert(error instanceof McpToolError);
+          assert.equal(error.message.includes("Failed: bad shape"), true);
+          assert.equal(error.message.includes('"bad shape"'), true);
+          return true;
+        },
+      );
     } finally {
       await connection?.transport.close();
       await new Promise<void>((resolve, reject) => httpServer.close((error) => (error ? reject(error) : resolve())));

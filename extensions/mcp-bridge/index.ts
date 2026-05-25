@@ -37,6 +37,17 @@ type BridgeConnection = {
   tools: Tool[];
 };
 
+type PiToolResult = {
+  content: Array<{ type: "text"; text: string }>;
+  details: {
+    server: string;
+    tool: string;
+    isError: boolean;
+    contentTypes: unknown[];
+    hasStructuredContent: boolean;
+  };
+};
+
 const DEFAULT_CONFIG_PATH = "~/.pi/agent/mcp.json";
 const MAX_RESULT_TEXT_BYTES = 50 * 1024;
 
@@ -154,6 +165,44 @@ function normalizeInputSchema(tool: Tool): JsonObject {
   };
 }
 
+function getMcpToolDetails(server: string, tool: string, result: unknown): PiToolResult["details"] {
+  const data = result && typeof result === "object" ? (result as JsonObject) : {};
+
+  return {
+    server,
+    tool,
+    isError: data.isError === true,
+    contentTypes: Array.isArray(data.content)
+      ? data.content.map((item) => (item && typeof item === "object" && "type" in item ? (item as JsonObject).type : typeof item))
+      : [],
+    hasStructuredContent: data.structuredContent !== undefined,
+  };
+}
+
+export class McpToolError extends Error {
+  readonly details: PiToolResult["details"];
+  readonly content: PiToolResult["content"];
+
+  constructor(server: string, tool: string, content: PiToolResult["content"], details: PiToolResult["details"]) {
+    const text = content.map((item) => item.text).join("\n").trim();
+    super(`MCP tool ${server}/${tool} failed${text ? `:\n${text}` : ""}`);
+    this.name = "McpToolError";
+    this.details = details;
+    this.content = content;
+  }
+}
+
+export function mcpToolResultToPiToolResult(server: string, tool: string, result: unknown): PiToolResult {
+  const content = normalizeMcpContent(result);
+  const details = getMcpToolDetails(server, tool, result);
+
+  if (details.isError) {
+    throw new McpToolError(server, tool, content, details);
+  }
+
+  return { content, details };
+}
+
 export async function connectServer(server: McpServerConfig): Promise<BridgeConnection> {
   const client = new Client({ name: "pi-mcp-bridge", version: "0.1.0" });
   const transport = new StreamableHTTPClientTransport(new URL(server.url), {
@@ -188,18 +237,7 @@ function registerMcpTool(pi: ExtensionAPI, connection: BridgeConnection, tool: T
         arguments: params as JsonObject,
       });
 
-      return {
-        content: normalizeMcpContent(result),
-        details: {
-          server: connection.server.name,
-          tool: tool.name,
-          isError: result.isError === true,
-          contentTypes: Array.isArray(result.content)
-            ? result.content.map((item) => (item && typeof item === "object" && "type" in item ? item.type : typeof item))
-            : [],
-          hasStructuredContent: result.structuredContent !== undefined,
-        },
-      };
+      return mcpToolResultToPiToolResult(connection.server.name, tool.name, result);
     },
   });
 }

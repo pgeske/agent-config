@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  McpToolError,
   buildToolName,
   expandEnv,
   loadConfigFromObject,
+  mcpToolResultToPiToolResult,
   normalizeMcpContent,
 } from "../extensions/mcp-bridge/index.ts";
 
@@ -78,6 +80,30 @@ describe("mcp-bridge", () => {
           text: 'Structured content:\n{"ok":true}',
         },
       ],
+    );
+  });
+
+  it("throws Pi tool failures for MCP callTool isError responses with useful details", () => {
+    assert.throws(
+      () =>
+        mcpToolResultToPiToolResult("draw", "create_scene", {
+          isError: true,
+          content: [{ type: "text", text: "Scene validation failed" }],
+          structuredContent: { code: "invalid_scene", field: "elements" },
+        }),
+      (error) => {
+        assert(error instanceof McpToolError);
+        assert.equal(error.message.includes("Scene validation failed"), true);
+        assert.equal(error.message.includes('"invalid_scene"'), true);
+        assert.deepEqual(error.details, {
+          server: "draw",
+          tool: "create_scene",
+          isError: true,
+          contentTypes: ["text"],
+          hasStructuredContent: true,
+        });
+        return true;
+      },
     );
   });
 });
