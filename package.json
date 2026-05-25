@@ -1,0 +1,22 @@
+{
+  "name": "agent-config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared agent configuration, reusable skills, and Pi extensions.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --import tsx tests/*.test.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "^0.75.5",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "typebox": "^1.1.38"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.75.5",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}
