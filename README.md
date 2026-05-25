@@ -16,6 +16,7 @@ Create and edit shared agent config only in this repo:
 
 - `~/projects/agent-config/AGENTS.md`
 - `~/projects/agent-config/skills/<skill-name>`
+- `~/projects/agent-config/extensions/<extension-name>`
 
 ### Tooling
 
@@ -30,6 +31,10 @@ Create and edit shared agent config only in this repo:
 
 OpenClaw skill targets are installed as copied directories, not symlinks, so rerunning `./install.sh` overwrites existing skill copies there automatically.
 
+Pi extension dependencies are managed by the root `package.json`; run `npm install` in this repo after cloning or updating extension dependencies.
+
+MCP bridge secrets belong in environment variables or local untracked config such as `~/.pi/agent/mcp.json`; use `.env.example` as a template only.
+
 ### Target config
 
-Edit `targets.yaml` for skill destination directories. The shared OpenCode `AGENTS.md` target is managed directly by `install.sh`.
+Edit `targets.yaml` for skill destination directories and Pi extension destinations. Shared AGENTS targets are managed directly by `install.sh`.

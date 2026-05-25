@@ -129,6 +129,10 @@ test_install_all_installs_pi_extensions() (
   assert_symlink_target \
     "$home_dir/.pi/agent/extensions/subagents" \
     "$ROOT_DIR/extensions/subagents"
+
+  assert_symlink_target \
+    "$home_dir/.pi/agent/extensions/mcp-bridge" \
+    "$ROOT_DIR/extensions/mcp-bridge"
 )
 
 test_extension_conflict_requires_force() (
