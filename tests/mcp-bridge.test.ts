@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   McpToolError,
   buildToolName,
+  buildUniqueToolName,
   expandEnv,
   loadConfigFromObject,
   mcpToolResultToPiToolResult,
@@ -51,6 +52,16 @@ describe("mcp-bridge", () => {
   it("creates stable pi-safe tool names", () => {
     assert.equal(buildToolName("excalidraw", "list_scenes"), "mcp_excalidraw_list_scenes");
     assert.equal(buildToolName("my-server", "tools/call"), "mcp_my_server_tools_call");
+  });
+
+  it("disambiguates colliding pi-safe tool names", () => {
+    const usedNames = new Set<string>();
+    const first = buildUniqueToolName("my-server", "tools/call", usedNames);
+    const second = buildUniqueToolName("my_server", "tools-call", usedNames);
+
+    assert.equal(first, "mcp_my_server_tools_call");
+    assert.match(second, /^mcp_my_server_tools_call_[a-f0-9]{8}$/);
+    assert.notEqual(first, second);
   });
 
   it("truncates large MCP text content", () => {

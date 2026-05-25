@@ -148,7 +148,7 @@ async function runLocalReview(options: CodexReviewOptions, cwd: string, outputPa
   if (options.extraPrompt) {
     args.push(options.extraPrompt);
   }
-  return runCommand("codex", args, cwd, DEFAULT_TIMEOUT_MS);
+  return runCommand("codex", args, cwd, DEFAULT_TIMEOUT_MS, true);
 }
 
 async function runPullRequestReview(options: CodexReviewOptions, ctx: ExtensionContext, outputPath: string): Promise<RunResult> {
@@ -177,7 +177,7 @@ async function runPullRequestReview(options: CodexReviewOptions, ctx: ExtensionC
     if (options.extraPrompt) {
       args.push(options.extraPrompt);
     }
-    return runCommand("codex", args, repoDir, DEFAULT_TIMEOUT_MS);
+    return runCommand("codex", args, repoDir, DEFAULT_TIMEOUT_MS, true);
   } finally {
     await fs.rm(tempRoot, { recursive: true, force: true });
   }

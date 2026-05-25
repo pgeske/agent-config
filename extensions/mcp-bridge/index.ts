@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
@@ -102,6 +103,24 @@ export function buildToolName(serverName: string, toolName: string): string {
   const safeServer = serverName.replace(/[^a-zA-Z0-9_]/g, "_");
   const safeTool = toolName.replace(/[^a-zA-Z0-9_]/g, "_");
   return `mcp_${safeServer}_${safeTool}`.replace(/_+/g, "_").toLowerCase();
+}
+
+export function buildUniqueToolName(serverName: string, toolName: string, usedNames: Set<string>): string {
+  const baseName = buildToolName(serverName, toolName);
+  if (!usedNames.has(baseName)) {
+    usedNames.add(baseName);
+    return baseName;
+  }
+
+  const hash = createHash("sha1").update(`${serverName}\0${toolName}`).digest("hex").slice(0, 8);
+  let candidate = `${baseName}_${hash}`;
+  let counter = 2;
+  while (usedNames.has(candidate)) {
+    candidate = `${baseName}_${hash}_${counter}`;
+    counter += 1;
+  }
+  usedNames.add(candidate);
+  return candidate;
 }
 
 function truncateText(text: string, maxBytes = MAX_RESULT_TEXT_BYTES): string {
@@ -222,8 +241,8 @@ export async function connectServer(server: McpServerConfig): Promise<BridgeConn
   return { server, client, transport, tools };
 }
 
-function registerMcpTool(pi: ExtensionAPI, connection: BridgeConnection, tool: Tool): void {
-  const name = buildToolName(connection.server.name, tool.name);
+function registerMcpTool(pi: ExtensionAPI, connection: BridgeConnection, tool: Tool, usedToolNames: Set<string>): void {
+  const name = buildUniqueToolName(connection.server.name, tool.name, usedToolNames);
 
   pi.registerTool({
     name,
@@ -244,6 +263,7 @@ function registerMcpTool(pi: ExtensionAPI, connection: BridgeConnection, tool: T
 
 export default async function mcpBridge(pi: ExtensionAPI) {
   const connections: BridgeConnection[] = [];
+  const usedToolNames = new Set<string>();
 
   pi.registerCommand("mcp-bridge-status", {
     description: "Show configured MCP bridge servers and tools",
@@ -267,7 +287,7 @@ export default async function mcpBridge(pi: ExtensionAPI) {
     try {
       const connection = await connectServer(server);
       connections.push(connection);
-      for (const tool of connection.tools) registerMcpTool(pi, connection, tool);
+      for (const tool of connection.tools) registerMcpTool(pi, connection, tool, usedToolNames);
     } catch (error) {
       console.warn(`mcp-bridge: failed to connect to ${server.name}:`, error);
     }
