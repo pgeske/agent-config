@@ -279,13 +279,10 @@ function registerMcpTool(pi: ExtensionAPI, connection: BridgeConnection, tool: T
     promptSnippet: `Call MCP tool ${connection.server.name}/${tool.name}`,
     parameters: normalizeInputSchema(tool) as never,
     async execute(_toolCallId, params) {
-      const result = await withTimeout(
-        connection.client.callTool({
-          name: tool.name,
-          arguments: params as JsonObject,
-        }),
-        `calling MCP tool ${connection.server.name}/${tool.name}`,
-      );
+      const result = await connection.client.callTool({
+        name: tool.name,
+        arguments: params as JsonObject,
+      });
 
       return mcpToolResultToPiToolResult(connection.server.name, tool.name, result);
     },
