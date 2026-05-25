@@ -347,6 +347,29 @@ if [[ -d "$EXTENSIONS_DIR" && ${#extension_targets[@]} -gt 0 ]]; then
 
     mkdir -p "$extension_target"
 
+    if [[ -d "$ROOT_DIR/node_modules" ]]; then
+      if [[ -e "$extension_target/node_modules" || -L "$extension_target/node_modules" ]]; then
+        if [[ -L "$extension_target/node_modules" ]] && [[ $(readlink -f "$extension_target/node_modules" || true) == "$ROOT_DIR/node_modules" ]]; then
+          skipped=$((skipped + 1))
+        elif [[ $force -ne 1 ]]; then
+          printf '  ! exists (use --force to replace): %s\n' "$extension_target/node_modules" >&2
+          exit 1
+        else
+          rm -rf "$extension_target/node_modules"
+          ln -s "$ROOT_DIR/node_modules" "$extension_target/node_modules"
+          printf '  linked %s -> %s\n' "$extension_target/node_modules" "$ROOT_DIR/node_modules"
+          updated=$((updated + 1))
+        fi
+      else
+        ln -s "$ROOT_DIR/node_modules" "$extension_target/node_modules"
+        printf '  linked %s -> %s\n' "$extension_target/node_modules" "$ROOT_DIR/node_modules"
+        created=$((created + 1))
+      fi
+    else
+      printf '  ! extension dependencies not installed; run npm install in %s\n' "$ROOT_DIR" >&2
+      exit 1
+    fi
+
     if [[ $prune -eq 1 ]]; then
       shopt -s nullglob
       for child in "$extension_target"/*; do

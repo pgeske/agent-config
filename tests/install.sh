@@ -137,6 +137,15 @@ test_install_all_installs_pi_extensions() (
   assert_symlink_target \
     "$home_dir/.pi/agent/extensions/excalidraw.ts" \
     "$ROOT_DIR/extensions/excalidraw.ts"
+
+  if [[ -d "$ROOT_DIR/node_modules" ]]; then
+    assert_symlink_target \
+      "$home_dir/.pi/agent/extensions/node_modules" \
+      "$ROOT_DIR/node_modules"
+
+    node -e "require.resolve('@modelcontextprotocol/sdk/client/index.js', { paths: [process.argv[1]] })" \
+      "$home_dir/.pi/agent/extensions/mcp-bridge"
+  fi
 )
 
 test_extension_conflict_requires_force() (
