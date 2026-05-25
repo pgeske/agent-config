@@ -1,11 +1,12 @@
 # Agent Config
 
-Shared agent configuration and reusable skills.
+Shared agent configuration, reusable skills, and Pi extensions.
 
 ## Structure
 
-- `AGENTS.md` - Shared instructions source installed into `~/.config/opencode/AGENTS.md`
+- `AGENTS.md` - Shared instructions source installed into configured AGENTS targets
 - `skills/` - Reusable skills and capabilities
+- `extensions/` - Reusable Pi extensions
 
 ## Usage
 
@@ -18,9 +19,9 @@ Create and edit shared agent config only in this repo:
 
 ### Tooling
 
-- Install managed config and all skills:
+- Install managed config, all skills, and Pi extensions:
   - `./install.sh`
-- Install managed config plus one or more named skills:
+- Install managed config, Pi extensions, plus one or more named skills:
   - `./install.sh my-skill another-skill`
 - Replace mismatched managed targets:
   - `./install.sh --force`

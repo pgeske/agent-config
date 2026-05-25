@@ -3,15 +3,15 @@ set -euo pipefail
 
 ROOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 SKILLS_DIR="$ROOT_DIR/skills"
+EXTENSIONS_DIR="$ROOT_DIR/extensions"
 TARGETS_FILE="$ROOT_DIR/targets.yaml"
 AGENTS_SOURCE="$ROOT_DIR/AGENTS.md"
-AGENTS_TARGET_RAW="~/.config/opencode/AGENTS.md"
 
 usage() {
   cat <<'EOF'
 Usage: ./install.sh [--force] [--prune] [skill ...]
 
-Install managed skills and shared agent config.
+Install managed skills, Pi extensions, and shared agent config.
 
 Options:
   --force  Replace existing files or directories for symlink-based targets
@@ -36,25 +36,47 @@ expand_path() {
   esac
 }
 
+normalize_target() {
+  local raw_target="$1"
+
+  if [[ $raw_target == \"*\" ]]; then
+    raw_target=${raw_target#\"}
+    raw_target=${raw_target%\"}
+  fi
+  if [[ $raw_target == \'*\' ]]; then
+    raw_target=${raw_target#\'}
+    raw_target=${raw_target%\'}
+  fi
+
+  expand_path "$raw_target"
+}
+
 load_targets() {
   local line
   local raw_target
+  local current_section=""
 
   while IFS= read -r line || [[ -n "$line" ]]; do
     [[ $line =~ ^[[:space:]]*# ]] && continue
     [[ $line =~ ^[[:space:]]*$ ]] && continue
 
+    if [[ $line =~ ^([a-z_]+):[[:space:]]*$ ]]; then
+      case "${BASH_REMATCH[1]}" in
+        targets|skill_targets) current_section="skill_targets" ;;
+        agents_targets) current_section="agents_targets" ;;
+        extension_targets|extensions_targets) current_section="extension_targets" ;;
+        *) current_section="" ;;
+      esac
+      continue
+    fi
+
     if [[ $line =~ ^[[:space:]]*-[[:space:]]*(.+)[[:space:]]*$ ]]; then
-      raw_target=${BASH_REMATCH[1]}
-      if [[ $raw_target == \"*\" ]]; then
-        raw_target=${raw_target#\"}
-        raw_target=${raw_target%\"}
-      fi
-      if [[ $raw_target == \'*\' ]]; then
-        raw_target=${raw_target#\'}
-        raw_target=${raw_target%\'}
-      fi
-      targets+=("$(expand_path "$raw_target")")
+      raw_target=$(normalize_target "${BASH_REMATCH[1]}")
+      case "$current_section" in
+        skill_targets) skill_targets+=("$raw_target") ;;
+        agents_targets) agents_targets+=("$raw_target") ;;
+        extension_targets) extension_targets+=("$raw_target") ;;
+      esac
     fi
   done < "$TARGETS_FILE"
 }
@@ -115,11 +137,18 @@ if [[ ! -f "$TARGETS_FILE" ]]; then
   exit 1
 fi
 
-targets=()
+skill_targets=()
+agents_targets=()
+extension_targets=()
 load_targets
 
-if [[ ${#targets[@]} -eq 0 ]]; then
-  printf 'No install targets configured in %s\n' "$TARGETS_FILE" >&2
+if [[ ${#skill_targets[@]} -eq 0 ]]; then
+  printf 'No skill targets configured in %s\n' "$TARGETS_FILE" >&2
+  exit 1
+fi
+
+if [[ ${#agents_targets[@]} -eq 0 ]]; then
+  printf 'No AGENTS targets configured in %s\n' "$TARGETS_FILE" >&2
   exit 1
 fi
 
@@ -195,7 +224,7 @@ skills_root=$(readlink -f "$SKILLS_DIR")
 
 printf 'Installing %s skill(s): %s\n' "${#skills[@]}" "$(printf '%s ' "${skills[@]}")"
 
-for target in "${targets[@]}"; do
+for target in "${skill_targets[@]}"; do
   printf '\n==> %s\n' "$target"
 
   install_mode=$(install_mode_for_target "$target")
@@ -277,11 +306,96 @@ for target in "${targets[@]}"; do
   done
 done
 
-agents_target=$(expand_path "$AGENTS_TARGET_RAW")
+if [[ -d "$EXTENSIONS_DIR" && ${#extension_targets[@]} -gt 0 ]]; then
+  extensions_root=$(readlink -f "$EXTENSIONS_DIR")
+  extension_dirs=()
+  shopt -s nullglob
+  for extension_dir in "$EXTENSIONS_DIR"/*; do
+    [[ -d "$extension_dir" && -f "$extension_dir/index.ts" ]] || continue
+    extension_dirs+=("$extension_dir")
+  done
+  shopt -u nullglob
 
-printf '\n==> %s\n' "$agents_target"
-if ! install_managed_symlink "$AGENTS_SOURCE" "$agents_target"; then
-  exit 1
+  if [[ ${#extension_dirs[@]} -gt 0 ]]; then
+    printf '\nInstalling %s extension(s)\n' "${#extension_dirs[@]}"
+  fi
+
+  contains_extension() {
+    local needle="$1"
+    local extension_dir
+    for extension_dir in "${extension_dirs[@]}"; do
+      if [[ "$(basename "$extension_dir")" == "$needle" ]]; then
+        return 0
+      fi
+    done
+    return 1
+  }
+
+  for extension_target in "${extension_targets[@]}"; do
+    printf '\n==> %s\n' "$extension_target"
+
+    if [[ -L "$extension_target" ]]; then
+      if [[ $force -ne 1 ]]; then
+        printf '  ! target root is a symlink (use --force to replace): %s\n' "$extension_target" >&2
+        exit 1
+      fi
+      rm -f "$extension_target"
+    fi
+
+    mkdir -p "$extension_target"
+
+    if [[ $prune -eq 1 ]]; then
+      shopt -s nullglob
+      for child in "$extension_target"/*; do
+        name=$(basename "$child")
+        if [[ "$name" == .* ]] || contains_extension "$name"; then
+          continue
+        fi
+
+        if [[ -L "$child" ]]; then
+          resolved_child=$(readlink -f "$child" || true)
+          if [[ "$resolved_child" == "$extensions_root"/* ]]; then
+            rm -f "$child"
+            printf '  pruned stale extension link: %s\n' "$child"
+          fi
+        fi
+      done
+      shopt -u nullglob
+    fi
+
+    for extension_dir in "${extension_dirs[@]}"; do
+      name=$(basename "$extension_dir")
+      src="$extension_dir"
+      dst="$extension_target/$name"
+
+      if [[ -e "$dst" || -L "$dst" ]]; then
+        if [[ -L "$dst" ]] && [[ $(readlink -f "$dst" || true) == "$src" ]]; then
+          skipped=$((skipped + 1))
+          continue
+        fi
+
+        if [[ $force -ne 1 ]]; then
+          printf '  ! exists (use --force to replace): %s\n' "$dst" >&2
+          exit 1
+        fi
+
+        rm -rf "$dst"
+        updated=$((updated + 1))
+      else
+        created=$((created + 1))
+      fi
+
+      ln -s "$src" "$dst"
+      printf '  linked %s -> %s\n' "$dst" "$src"
+    done
+  done
 fi
+
+for agents_target in "${agents_targets[@]}"; do
+  printf '\n==> %s\n' "$agents_target"
+  if ! install_managed_symlink "$AGENTS_SOURCE" "$agents_target"; then
+    exit 1
+  fi
+done
 
 printf '\nDone. created=%s updated=%s skipped=%s\n' "$created" "$updated" "$skipped"

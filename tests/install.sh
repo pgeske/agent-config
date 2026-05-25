@@ -45,6 +45,10 @@ test_install_all_creates_opencode_agents_symlink() (
   assert_symlink_target \
     "$home_dir/.config/opencode/AGENTS.md" \
     "$ROOT_DIR/AGENTS.md"
+
+  assert_symlink_target \
+    "$home_dir/.pi/agent/AGENTS.md" \
+    "$ROOT_DIR/AGENTS.md"
 )
 
 test_named_skill_install_still_installs_agents() (
@@ -114,12 +118,111 @@ test_named_gather_context_install_still_installs_agents() (
     "$ROOT_DIR/skills/gather-context"
 )
 
+test_install_all_installs_pi_extensions() (
+  local home_dir
+
+  home_dir=$(mktemp -d)
+  trap 'rm -rf "$home_dir"' EXIT
+
+  run_install "$home_dir"
+
+  assert_symlink_target \
+    "$home_dir/.pi/agent/extensions/subagents" \
+    "$ROOT_DIR/extensions/subagents"
+)
+
+test_extension_conflict_requires_force() (
+  local home_dir
+  local output
+
+  home_dir=$(mktemp -d)
+  trap 'rm -rf "$home_dir"' EXIT
+
+  mkdir -p "$home_dir/.pi/agent/extensions/subagents"
+  printf 'local-only\n' > "$home_dir/.pi/agent/extensions/subagents/index.ts"
+
+  if output=$(run_install "$home_dir" 2>&1); then
+    printf 'expected install to fail without --force\n' >&2
+    return 1
+  fi
+
+  case "$output" in
+    *"exists (use --force to replace): $home_dir/.pi/agent/extensions/subagents"*)
+      ;;
+    *)
+      printf 'unexpected error output:\n%s\n' "$output" >&2
+      return 1
+      ;;
+  esac
+
+  run_install "$home_dir" --force >/dev/null
+
+  assert_symlink_target \
+    "$home_dir/.pi/agent/extensions/subagents" \
+    "$ROOT_DIR/extensions/subagents"
+)
+
+test_extension_target_root_symlink_requires_force() (
+  local home_dir
+  local output
+
+  home_dir=$(mktemp -d)
+  trap 'rm -rf "$home_dir"' EXIT
+
+  mkdir -p "$home_dir/.pi/agent" "$home_dir/extension-target"
+  ln -s "$home_dir/extension-target" "$home_dir/.pi/agent/extensions"
+
+  if output=$(run_install "$home_dir" 2>&1); then
+    printf 'expected install to fail without --force\n' >&2
+    return 1
+  fi
+
+  case "$output" in
+    *"target root is a symlink (use --force to replace): $home_dir/.pi/agent/extensions"*)
+      ;;
+    *)
+      printf 'unexpected error output:\n%s\n' "$output" >&2
+      return 1
+      ;;
+  esac
+
+  run_install "$home_dir" --force >/dev/null
+
+  [[ -d "$home_dir/.pi/agent/extensions" && ! -L "$home_dir/.pi/agent/extensions" ]] || {
+    printf 'expected extension target root to be a real directory\n' >&2
+    return 1
+  }
+
+  assert_symlink_target \
+    "$home_dir/.pi/agent/extensions/subagents" \
+    "$ROOT_DIR/extensions/subagents"
+)
+
+test_prune_removes_stale_extension_links() (
+  local home_dir
+
+  home_dir=$(mktemp -d)
+  trap 'rm -rf "$home_dir" "$ROOT_DIR/extensions/.stale-test"' EXIT
+
+  mkdir -p "$home_dir/.pi/agent/extensions" "$ROOT_DIR/extensions/.stale-test/old-extension"
+  touch "$ROOT_DIR/extensions/.stale-test/old-extension/index.ts"
+  ln -s "$ROOT_DIR/extensions/.stale-test/old-extension" "$home_dir/.pi/agent/extensions/old-extension"
+
+  run_install "$home_dir" --prune >/dev/null
+
+  [[ ! -e "$home_dir/.pi/agent/extensions/old-extension" && ! -L "$home_dir/.pi/agent/extensions/old-extension" ]] || {
+    printf 'expected stale extension link to be pruned\n' >&2
+    return 1
+  }
+)
+
 test_managed_files_do_not_reference_legacy_plugin() (
   assert_no_matches 'super''powers' \
     "$ROOT_DIR/AGENTS.md" \
     "$ROOT_DIR/install.sh" \
     "$ROOT_DIR/targets.yaml" \
-    "$ROOT_DIR/skills"
+    "$ROOT_DIR/skills" \
+    "$ROOT_DIR/extensions"
 )
 
 test_existing_unmanaged_agents_file_requires_force() (
@@ -174,6 +277,10 @@ main() {
   test_named_skill_install_still_installs_agents
   test_named_development_workflow_stack_installs_skills
   test_named_gather_context_install_still_installs_agents
+  test_install_all_installs_pi_extensions
+  test_extension_conflict_requires_force
+  test_extension_target_root_symlink_requires_force
+  test_prune_removes_stale_extension_links
   test_existing_unmanaged_agents_file_requires_force
   test_force_replaces_stale_target_root_symlink
   test_managed_files_do_not_reference_legacy_plugin
