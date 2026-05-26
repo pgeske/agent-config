@@ -83,6 +83,7 @@ interface GroupRecord {
   followUpJobIds: string[];
   afterAllScheduled: boolean;
   notifiedAllDone: boolean;
+  personaOrder: string[];
   defaultModel?: string;
 }
 
@@ -263,8 +264,18 @@ function statusBadge(status: JobStatus, color?: (name: any, text: string) => str
 
 const PERSONAS = ["Alyosha", "Killua", "Takkun", "Vash", "Guts"];
 
-function personaFor(index: number): string {
-  return PERSONAS[index % PERSONAS.length];
+function shuffledPersonas(): string[] {
+  const personas = [...PERSONAS];
+  for (let i = personas.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [personas[i], personas[j]] = [personas[j], personas[i]];
+  }
+  return personas;
+}
+
+function personaFor(group: GroupRecord, index: number): string {
+  const personas = group.personaOrder.length > 0 ? group.personaOrder : PERSONAS;
+  return personas[index % personas.length];
 }
 
 function extractText(message: any): string {
@@ -603,7 +614,7 @@ export default function (pi: ExtensionAPI) {
       id,
       groupId: group.id,
       name: input.name ?? `${preset.name}-${id}`,
-      persona: input.persona ?? personaFor(personaIndex),
+      persona: input.persona ?? personaFor(group, personaIndex),
       agent: preset.name,
       task: input.task,
       cwd: path.resolve(input.cwd ?? process.cwd()),
@@ -743,6 +754,7 @@ export default function (pi: ExtensionAPI) {
         followUpJobIds: [],
         afterAllScheduled: false,
         notifiedAllDone: false,
+        personaOrder: shuffledPersonas(),
         defaultModel: currentModel,
       };
       groups.set(group.id, group);
