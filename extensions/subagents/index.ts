@@ -262,7 +262,7 @@ function statusBadge(status: JobStatus, color?: (name: any, text: string) => str
   }
 }
 
-const PERSONAS = ["Alyosha", "Killua", "Takkun", "Vash", "Guts"];
+const PERSONAS = ["Squall", "Rinoa", "Quistis", "Zell", "Selphie", "Irvine", "Seifer"];
 
 function shuffledPersonas(): string[] {
   const personas = [...PERSONAS];
