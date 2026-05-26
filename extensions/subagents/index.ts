@@ -273,9 +273,56 @@ function shuffledPersonas(): string[] {
   return personas;
 }
 
-function personaFor(group: GroupRecord, index: number): string {
+function normalizePersona(persona: string): string {
+  return persona.trim().toLowerCase();
+}
+
+function assignedPersonaKeys(jobs: Map<string, JobRecord>): Set<string> {
+  return new Set(Array.from(jobs.values(), (job) => normalizePersona(job.persona)));
+}
+
+function availablePersonas(group: GroupRecord, jobs: Map<string, JobRecord>): string[] {
+  const assigned = assignedPersonaKeys(jobs);
   const personas = group.personaOrder.length > 0 ? group.personaOrder : PERSONAS;
-  return personas[index % personas.length];
+  return personas.filter((persona) => !assigned.has(normalizePersona(persona)));
+}
+
+function allocateBuiltinPersona(group: GroupRecord, jobs: Map<string, JobRecord>): string | undefined {
+  return availablePersonas(group, jobs)[0];
+}
+
+function validateExplicitPersonas(tasks: DelegateTask[], jobs: Map<string, JobRecord>): string | undefined {
+  const assigned = assignedPersonaKeys(jobs);
+  const requested = new Set<string>();
+  for (const task of tasks) {
+    if (!task.persona) continue;
+    const key = normalizePersona(task.persona);
+    if (requested.has(key)) return `Persona ${task.persona} is duplicated in this request. Persona names must be unique until cleared with /subagents clear.`;
+    if (assigned.has(key)) return `Persona ${task.persona} is already assigned to an uncleared subagent job. Run /subagents clear to free completed agents.`;
+    requested.add(key);
+  }
+  return undefined;
+}
+
+function planTaskPersonas(tasks: DelegateTask[], group: GroupRecord, jobs: Map<string, JobRecord>): { personas: string[]; error?: string } {
+  const explicitError = validateExplicitPersonas(tasks, jobs);
+  if (explicitError) return { personas: [], error: explicitError };
+
+  const explicit = new Set(tasks.filter((task) => task.persona).map((task) => normalizePersona(task.persona!)));
+  const available = availablePersonas(group, jobs).filter((persona) => !explicit.has(normalizePersona(persona)));
+  const implicitCount = tasks.filter((task) => !task.persona).length;
+  if (implicitCount > available.length) {
+    const allAssigned = available.length === 0;
+    const reason = allAssigned
+      ? "All built-in subagent personas are assigned"
+      : `Insufficient built-in subagent personas are available (${available.length} available, ${implicitCount} needed)`;
+    return { personas: [], error: `${reason}. Run /subagents clear to free completed agents before delegating more subagents.` };
+  }
+
+  let implicitIndex = 0;
+  return {
+    personas: tasks.map((task) => task.persona ? task.persona.trim() : available[implicitIndex++]),
+  };
 }
 
 function extractText(message: any): string {
@@ -609,12 +656,15 @@ export default function (pi: ExtensionAPI) {
     const preset = presets[input.agent] ?? presets.generic;
     const id = shortId();
     const writeAccess = input.writeAccess ?? preset.writeAccess;
-    const personaIndex = group.primaryJobIds.length + group.followUpJobIds.length;
+    const persona = input.persona ?? allocateBuiltinPersona(group, jobs);
+    if (!persona) throw new Error("All built-in subagent personas are assigned. Run /subagents clear to free completed agents before delegating more subagents.");
+    const explicitError = input.persona ? validateExplicitPersonas([input], jobs) : undefined;
+    if (explicitError) throw new Error(explicitError);
     const job: JobRecord = {
       id,
       groupId: group.id,
       name: input.name ?? `${preset.name}-${id}`,
-      persona: input.persona ?? personaFor(group, personaIndex),
+      persona,
       agent: preset.name,
       task: input.task,
       cwd: path.resolve(input.cwd ?? process.cwd()),
@@ -757,6 +807,15 @@ export default function (pi: ExtensionAPI) {
         personaOrder: shuffledPersonas(),
         defaultModel: currentModel,
       };
+      const personaPlan = planTaskPersonas(params.tasks, group, jobs);
+      if (personaPlan.error) {
+        return {
+          content: toolText(personaPlan.error),
+          details: { started: false, reason: personaPlan.error },
+          terminate: true,
+        };
+      }
+
       groups.set(group.id, group);
       latestGroupId = group.id;
 
@@ -764,7 +823,7 @@ export default function (pi: ExtensionAPI) {
         ? "\n\nNote: mergePolicy=integrate creates integration guidance in v1; it does not automatically merge into the parent branch."
         : "";
 
-      const started = params.tasks.map((task: DelegateTask) => scheduleJob(group, { ...task, cwd: task.cwd ?? params.cwd ?? ctx.cwd }, "primary"));
+      const started = params.tasks.map((task: DelegateTask, index: number) => scheduleJob(group, { ...task, persona: personaPlan.personas[index], cwd: task.cwd ?? params.cwd ?? ctx.cwd }, "primary"));
       const summary = started.map((job) => `- ${job.name}: ${job.id}${job.writeAccess ? ` (${job.branch ?? "worktree pending"})` : ""}`).join("\n");
       return {
         content: toolText(`Started subagent group ${group.id}.\n\n${summary}\n\nUse check_subagents to inspect progress.${integrateNote}`),
