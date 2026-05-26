@@ -383,7 +383,34 @@ export default function (pi: ExtensionAPI) {
   let latestGroupId: string | undefined;
   let dashboardCleared = true;
 
-  const hasActiveJobs = () => Array.from(jobs.values()).some((job) => job.status === "queued" || job.status === "running");
+  const isActiveJob = (job: JobRecord) => job.status === "queued" || job.status === "running";
+
+  const parseCommandArgs = (args: unknown): string[] => {
+    if (Array.isArray(args)) return args.map(String);
+    if (typeof args === "string") return args.trim().split(/\s+/).filter(Boolean);
+    return [];
+  };
+
+  const clearInactiveJobs = (): number => {
+    let cleared = 0;
+    for (const [id, job] of jobs) {
+      if (isActiveJob(job)) continue;
+      jobs.delete(id);
+      cleared += 1;
+    }
+    for (const [id, group] of groups) {
+      const groupJobs = Array.from(jobs.values()).filter((job) => job.groupId === id);
+      if (groupJobs.length === 0) groups.delete(id);
+      else {
+        group.primaryJobIds = group.primaryJobIds.filter((jobId) => jobs.has(jobId));
+        group.followUpJobIds = group.followUpJobIds.filter((jobId) => jobs.has(jobId));
+      }
+    }
+    if (latestGroupId && !groups.has(latestGroupId)) latestGroupId = undefined;
+    dashboardCleared = true;
+    updateDashboard();
+    return cleared;
+  };
 
   const updateDashboard = () => {
     if (!latestCtx?.hasUI) return;
@@ -391,14 +418,14 @@ export default function (pi: ExtensionAPI) {
     const allJobs = Array.from(jobs.values()).sort((a, b) => a.createdAt - b.createdAt);
     const activeGroupIds = new Set(
       allJobs
-        .filter((job) => job.status === "queued" || job.status === "running")
+        .filter(isActiveJob)
         .map((job) => job.groupId),
     );
 
     const visibleJobs = allJobs
       .filter((job) => {
         if (activeGroupIds.size > 0) return activeGroupIds.has(job.groupId);
-        return !dashboardCleared && job.groupId === latestGroupId;
+        return !dashboardCleared;
       })
       .slice(-8);
 
@@ -682,22 +709,25 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("input", (_event, ctx) => {
     latestCtx = ctx;
-    if (!hasActiveJobs()) {
-      dashboardCleared = true;
-      updateDashboard();
-    }
+    updateDashboard();
   });
 
   pi.registerCommand("subagents", {
-    description: "Show background subagent jobs",
-    handler: async (_args, ctx) => {
+    description: "Show background subagent jobs, or clear completed jobs with: subagents clear",
+    handler: async (args, ctx) => {
       latestCtx = ctx;
-      const all = Array.from(jobs.values()).sort((a, b) => b.createdAt - a.createdAt);
-      if (all.length === 0) {
-        ctx.ui.notify("No subagent jobs yet.", "info");
+      const [action] = parseCommandArgs(args);
+      if (action === "clear") {
+        const cleared = clearInactiveJobs();
+        ctx.ui.notify(`Cleared ${cleared} inactive subagent job(s).`, "info");
         return;
       }
-      ctx.ui.notify(all.slice(0, 10).map(summarizeJob).join("\n\n"), "info");
+      const all = Array.from(jobs.values()).sort((a, b) => b.createdAt - a.createdAt);
+      if (all.length === 0) {
+        ctx.ui.notify("No subagent jobs yet. Use /subagents clear to clear completed jobs.", "info");
+        return;
+      }
+      ctx.ui.notify(`${all.slice(0, 10).map(summarizeJob).join("\n\n")}\n\nUse /subagents clear to clear completed jobs.`, "info");
     },
   });
 
@@ -756,7 +786,7 @@ export default function (pi: ExtensionAPI) {
       let selected = Array.from(jobs.values());
       if (params.jobId) selected = selected.filter((job) => job.id === params.jobId);
       if (params.groupId) selected = selected.filter((job) => job.groupId === params.groupId);
-      if (params.includeCompleted === false) selected = selected.filter((job) => job.status === "queued" || job.status === "running");
+      if (params.includeCompleted === false) selected = selected.filter(isActiveJob);
       selected.sort((a, b) => a.createdAt - b.createdAt);
       if (selected.length === 0) return { content: toolText("No matching subagent jobs."), details: { jobs: [] } };
       return {
@@ -773,7 +803,7 @@ export default function (pi: ExtensionAPI) {
     parameters: CancelParams,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       latestCtx = ctx;
-      let selected = Array.from(jobs.values()).filter((job) => job.status === "queued" || job.status === "running");
+      let selected = Array.from(jobs.values()).filter(isActiveJob);
       if (params.jobId) selected = selected.filter((job) => job.id === params.jobId);
       if (params.groupId) selected = selected.filter((job) => job.groupId === params.groupId);
       if (!params.all && !params.jobId && !params.groupId) {
