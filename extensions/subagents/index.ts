@@ -190,7 +190,7 @@ const presets: Record<string, AgentPreset> = {
 
 const TaskSchema = Type.Object({
   name: Type.Optional(Type.String({ description: "Human-readable job label" })),
-  persona: Type.Optional(Type.String({ description: "Optional friendly subagent name, e.g. Ada or Grace" })),
+  persona: Type.Optional(Type.String({ description: "Optional friendly party member name, e.g. Squall or Rinoa" })),
   agent: Type.String({ description: "Agent preset: scout, planner, worker, tester, reviewer, code-reviewer, merger, or generic" }),
   task: Type.String({ description: "Task to delegate" }),
   cwd: Type.Optional(Type.String({ description: "Working directory for this job" })),
@@ -381,7 +381,6 @@ export default function (pi: ExtensionAPI) {
   const groups = new Map<string, GroupRecord>();
   let latestCtx: ExtensionContext | undefined;
   let latestGroupId: string | undefined;
-  let dashboardCleared = true;
 
   const isActiveJob = (job: JobRecord) => job.status === "queued" || job.status === "running";
 
@@ -407,7 +406,6 @@ export default function (pi: ExtensionAPI) {
       }
     }
     if (latestGroupId && !groups.has(latestGroupId)) latestGroupId = undefined;
-    dashboardCleared = true;
     updateDashboard();
     return cleared;
   };
@@ -415,18 +413,8 @@ export default function (pi: ExtensionAPI) {
   const updateDashboard = () => {
     if (!latestCtx?.hasUI) return;
 
-    const allJobs = Array.from(jobs.values()).sort((a, b) => a.createdAt - b.createdAt);
-    const activeGroupIds = new Set(
-      allJobs
-        .filter(isActiveJob)
-        .map((job) => job.groupId),
-    );
-
-    const visibleJobs = allJobs
-      .filter((job) => {
-        if (activeGroupIds.size > 0) return activeGroupIds.has(job.groupId);
-        return !dashboardCleared;
-      })
+    const visibleJobs = Array.from(jobs.values())
+      .sort((a, b) => a.createdAt - b.createdAt)
       .slice(-8);
 
     if (visibleJobs.length === 0) {
@@ -759,7 +747,6 @@ export default function (pi: ExtensionAPI) {
       };
       groups.set(group.id, group);
       latestGroupId = group.id;
-      dashboardCleared = false;
 
       const integrateNote = group.mergePolicy === "integrate"
         ? "\n\nNote: mergePolicy=integrate creates integration guidance in v1; it does not automatically merge into the parent branch."
