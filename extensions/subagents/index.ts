@@ -202,7 +202,7 @@ const TaskSchema = Type.Object({
 });
 
 const DelegateParams = Type.Object({
-  tasks: Type.Array(TaskSchema, { minItems: 1, maxItems: 8, description: "Party member jobs to start" }),
+  tasks: Type.Array(TaskSchema, { minItems: 1, maxItems: 7, description: "Party member jobs to start" }),
   reviewPolicy: Type.Optional(StringEnum(["none", "after_each", "after_all"] as const, { default: "after_all" })),
   testPolicy: Type.Optional(StringEnum(["none", "after_each", "after_all"] as const, { default: "none" })),
   mergePolicy: Type.Optional(StringEnum(["none", "manual", "integrate"] as const, { default: "manual" })),
@@ -297,11 +297,22 @@ function validateExplicitPersonas(tasks: DelegateTask[], jobs: Map<string, JobRe
   for (const task of tasks) {
     if (!task.persona) continue;
     const key = normalizePersona(task.persona);
-    if (requested.has(key)) return `Persona ${task.persona} is duplicated in this request. Persona names must be unique until cleared with /subagents clear.`;
-    if (assigned.has(key)) return `Persona ${task.persona} is already assigned to an uncleared subagent job. Run /subagents clear to free completed agents.`;
+    if (requested.has(key)) return `Party member ${task.persona} is duplicated in this request. Party member names must be unique until cleared with /subagents clear.`;
+    if (assigned.has(key)) return `Party member ${task.persona} is already assigned to an uncleared job. Run /subagents clear to free completed party members.`;
     requested.add(key);
   }
   return undefined;
+}
+
+function policyFollowUpPersonaCount(primaryTaskCount: number, group: GroupRecord): number {
+  if (primaryTaskCount === 0) return 0;
+  let count = 0;
+  if (group.reviewPolicy === "after_each") count += primaryTaskCount;
+  else if (group.reviewPolicy === "after_all") count += 1;
+  if (group.testPolicy === "after_each") count += primaryTaskCount;
+  else if (group.testPolicy === "after_all") count += 1;
+  if (group.mergePolicy === "integrate") count += 1;
+  return count;
 }
 
 function planTaskPersonas(tasks: DelegateTask[], group: GroupRecord, jobs: Map<string, JobRecord>): { personas: string[]; error?: string } {
@@ -311,12 +322,15 @@ function planTaskPersonas(tasks: DelegateTask[], group: GroupRecord, jobs: Map<s
   const explicit = new Set(tasks.filter((task) => task.persona).map((task) => normalizePersona(task.persona!)));
   const available = availablePersonas(group, jobs).filter((persona) => !explicit.has(normalizePersona(persona)));
   const implicitCount = tasks.filter((task) => !task.persona).length;
-  if (implicitCount > available.length) {
+  const reservedFollowUps = policyFollowUpPersonaCount(tasks.length, group);
+  const neededCount = implicitCount + reservedFollowUps;
+  if (neededCount > available.length) {
     const allAssigned = available.length === 0;
+    const followUpNote = reservedFollowUps > 0 ? ` including ${reservedFollowUps} reserved for policy follow-up party members` : "";
     const reason = allAssigned
-      ? "All built-in subagent personas are assigned"
-      : `Insufficient built-in subagent personas are available (${available.length} available, ${implicitCount} needed)`;
-    return { personas: [], error: `${reason}. Run /subagents clear to free completed agents before delegating more subagents.` };
+      ? "All built-in party members are assigned"
+      : `Insufficient built-in party members are available (${available.length} available, ${neededCount} needed${followUpNote})`;
+    return { personas: [], error: `${reason}. Run /subagents clear to free completed party members before delegating more party members.` };
   }
 
   let implicitIndex = 0;
@@ -657,7 +671,7 @@ export default function (pi: ExtensionAPI) {
     const id = shortId();
     const writeAccess = input.writeAccess ?? preset.writeAccess;
     const persona = input.persona ?? allocateBuiltinPersona(group, jobs);
-    if (!persona) throw new Error("All built-in subagent personas are assigned. Run /subagents clear to free completed agents before delegating more subagents.");
+    if (!persona) throw new Error("All built-in party members are assigned. Run /subagents clear to free completed party members before delegating more party members.");
     const explicitError = input.persona ? validateExplicitPersonas([input], jobs) : undefined;
     if (explicitError) throw new Error(explicitError);
     const job: JobRecord = {
