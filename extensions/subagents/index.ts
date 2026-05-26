@@ -204,7 +204,7 @@ const TaskSchema = Type.Object({
 
 const DelegateParams = Type.Object({
   tasks: Type.Array(TaskSchema, { minItems: 1, maxItems: 7, description: "Party member jobs to start" }),
-  reviewPolicy: Type.Optional(StringEnum(["none", "after_each", "after_all"] as const, { default: "after_all" })),
+  reviewPolicy: Type.Optional(StringEnum(["none", "after_each", "after_all"] as const, { default: "none" })),
   testPolicy: Type.Optional(StringEnum(["none", "after_each", "after_all"] as const, { default: "none" })),
   mergePolicy: Type.Optional(StringEnum(["none", "manual", "integrate"] as const, { default: "manual" })),
   notify: Type.Optional(StringEnum(["silent", "on_each_done", "on_all_done", "on_error"] as const, { default: "on_all_done" })),
@@ -473,8 +473,9 @@ export default function (pi: ExtensionAPI) {
 
   const clearInactiveJobs = (): number => {
     let cleared = 0;
+    const activeGroupIds = new Set(Array.from(jobs.values()).filter(isActiveJob).map((job) => job.groupId));
     for (const [id, job] of jobs) {
-      if (isActiveJob(job)) continue;
+      if (isActiveJob(job) || activeGroupIds.has(job.groupId)) continue;
       jobs.delete(id);
       cleared += 1;
     }
@@ -819,7 +820,7 @@ export default function (pi: ExtensionAPI) {
       const group: GroupRecord = {
         id: shortId(),
         createdAt: Date.now(),
-        reviewPolicy: params.reviewPolicy ?? "after_all",
+        reviewPolicy: params.reviewPolicy ?? "none",
         testPolicy: params.testPolicy ?? "none",
         mergePolicy: params.mergePolicy ?? "manual",
         notify: params.notify ?? "on_all_done",
