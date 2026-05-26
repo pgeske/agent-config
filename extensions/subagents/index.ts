@@ -83,6 +83,8 @@ interface GroupRecord {
   followUpJobIds: string[];
   afterAllScheduled: boolean;
   notifiedAllDone: boolean;
+  personaOrder: string[];
+  reservedPersonas: string[];
   defaultModel?: string;
 }
 
@@ -190,7 +192,7 @@ const presets: Record<string, AgentPreset> = {
 
 const TaskSchema = Type.Object({
   name: Type.Optional(Type.String({ description: "Human-readable job label" })),
-  persona: Type.Optional(Type.String({ description: "Optional friendly subagent name, e.g. Ada or Grace" })),
+  persona: Type.Optional(Type.String({ description: "Optional friendly party member name, e.g. Squall or Rinoa" })),
   agent: Type.String({ description: "Agent preset: scout, planner, worker, tester, reviewer, code-reviewer, merger, or generic" }),
   task: Type.String({ description: "Task to delegate" }),
   cwd: Type.Optional(Type.String({ description: "Working directory for this job" })),
@@ -201,8 +203,8 @@ const TaskSchema = Type.Object({
 });
 
 const DelegateParams = Type.Object({
-  tasks: Type.Array(TaskSchema, { minItems: 1, maxItems: 8, description: "Subagent jobs to start" }),
-  reviewPolicy: Type.Optional(StringEnum(["none", "after_each", "after_all"] as const, { default: "after_all" })),
+  tasks: Type.Array(TaskSchema, { minItems: 1, maxItems: 7, description: "Party member jobs to start" }),
+  reviewPolicy: Type.Optional(StringEnum(["none", "after_each", "after_all"] as const, { default: "none" })),
   testPolicy: Type.Optional(StringEnum(["none", "after_each", "after_all"] as const, { default: "none" })),
   mergePolicy: Type.Optional(StringEnum(["none", "manual", "integrate"] as const, { default: "manual" })),
   notify: Type.Optional(StringEnum(["silent", "on_each_done", "on_all_done", "on_error"] as const, { default: "on_all_done" })),
@@ -261,10 +263,89 @@ function statusBadge(status: JobStatus, color?: (name: any, text: string) => str
   }
 }
 
-const PERSONAS = ["Ada", "Grace", "Linus", "Margaret", "Alan", "Barbara", "Edsger", "Radia", "Ken", "Fran"];
+const PERSONAS = ["Squall", "Rinoa", "Quistis", "Zell", "Selphie", "Irvine", "Seifer"];
 
-function personaFor(index: number): string {
-  return PERSONAS[index % PERSONAS.length];
+function shuffledPersonas(): string[] {
+  const personas = [...PERSONAS];
+  for (let i = personas.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [personas[i], personas[j]] = [personas[j], personas[i]];
+  }
+  return personas;
+}
+
+function normalizePersona(persona: string): string {
+  return persona.trim().toLowerCase();
+}
+
+function assignedPersonaKeys(jobs: Map<string, JobRecord>, groups?: Map<string, GroupRecord>): Set<string> {
+  const assigned = new Set(Array.from(jobs.values(), (job) => normalizePersona(job.persona)));
+  if (groups) {
+    for (const group of groups.values()) {
+      for (const persona of group.reservedPersonas) assigned.add(normalizePersona(persona));
+    }
+  }
+  return assigned;
+}
+
+function availablePersonas(group: GroupRecord, jobs: Map<string, JobRecord>, groups?: Map<string, GroupRecord>): string[] {
+  const assigned = assignedPersonaKeys(jobs, groups);
+  const personas = group.personaOrder.length > 0 ? group.personaOrder : PERSONAS;
+  return personas.filter((persona) => !assigned.has(normalizePersona(persona)));
+}
+
+function allocateBuiltinPersona(group: GroupRecord, jobs: Map<string, JobRecord>, groups: Map<string, GroupRecord>): string | undefined {
+  return group.reservedPersonas.shift() ?? availablePersonas(group, jobs, groups)[0];
+}
+
+function validateExplicitPersonas(tasks: DelegateTask[], jobs: Map<string, JobRecord>, groups?: Map<string, GroupRecord>): string | undefined {
+  const assigned = assignedPersonaKeys(jobs, groups);
+  const requested = new Set<string>();
+  for (const task of tasks) {
+    if (!task.persona) continue;
+    const key = normalizePersona(task.persona);
+    if (requested.has(key)) return `Party member ${task.persona} is duplicated in this request. Party member names must be unique until cleared with /subagents clear.`;
+    if (assigned.has(key)) return `Party member ${task.persona} is already assigned to an uncleared job. Run /subagents clear to free completed party members.`;
+    requested.add(key);
+  }
+  return undefined;
+}
+
+function policyFollowUpPersonaCount(primaryTaskCount: number, group: GroupRecord): number {
+  if (primaryTaskCount === 0) return 0;
+  let count = 0;
+  if (group.reviewPolicy === "after_each") count += primaryTaskCount;
+  else if (group.reviewPolicy === "after_all") count += 1;
+  if (group.testPolicy === "after_each") count += primaryTaskCount;
+  else if (group.testPolicy === "after_all") count += 1;
+  if (group.mergePolicy === "integrate") count += 1;
+  return count;
+}
+
+function planTaskPersonas(tasks: DelegateTask[], group: GroupRecord, jobs: Map<string, JobRecord>, groups: Map<string, GroupRecord>): { personas: string[]; reservedPersonas: string[]; error?: string } {
+  const explicitError = validateExplicitPersonas(tasks, jobs, groups);
+  if (explicitError) return { personas: [], reservedPersonas: [], error: explicitError };
+
+  const explicit = new Set(tasks.filter((task) => task.persona).map((task) => normalizePersona(task.persona!)));
+  const available = availablePersonas(group, jobs, groups).filter((persona) => !explicit.has(normalizePersona(persona)));
+  const implicitCount = tasks.filter((task) => !task.persona).length;
+  const reservedFollowUps = policyFollowUpPersonaCount(tasks.length, group);
+  const neededCount = implicitCount + reservedFollowUps;
+  if (neededCount > available.length) {
+    const allAssigned = available.length === 0;
+    const followUpNote = reservedFollowUps > 0 ? ` including ${reservedFollowUps} reserved for policy follow-up party members` : "";
+    const reason = allAssigned
+      ? "All built-in party members are assigned"
+      : `Insufficient built-in party members are available (${available.length} available, ${neededCount} needed${followUpNote})`;
+    return { personas: [], reservedPersonas: [], error: `${reason}. Run /subagents clear to free completed party members before delegating more party members.` };
+  }
+
+  let implicitIndex = 0;
+  const personas = tasks.map((task) => task.persona ? task.persona.trim() : available[implicitIndex++]);
+  return {
+    personas,
+    reservedPersonas: available.slice(implicitIndex, implicitIndex + reservedFollowUps),
+  };
 }
 
 function extractText(message: any): string {
@@ -381,25 +462,41 @@ export default function (pi: ExtensionAPI) {
   const groups = new Map<string, GroupRecord>();
   let latestCtx: ExtensionContext | undefined;
   let latestGroupId: string | undefined;
-  let dashboardCleared = true;
 
-  const hasActiveJobs = () => Array.from(jobs.values()).some((job) => job.status === "queued" || job.status === "running");
+  const isActiveJob = (job: JobRecord) => job.status === "queued" || job.status === "running";
+
+  const parseCommandArgs = (args: unknown): string[] => {
+    if (Array.isArray(args)) return args.map(String);
+    if (typeof args === "string") return args.trim().split(/\s+/).filter(Boolean);
+    return [];
+  };
+
+  const clearInactiveJobs = (): number => {
+    let cleared = 0;
+    const activeGroupIds = new Set(Array.from(jobs.values()).filter(isActiveJob).map((job) => job.groupId));
+    for (const [id, job] of jobs) {
+      if (isActiveJob(job) || activeGroupIds.has(job.groupId)) continue;
+      jobs.delete(id);
+      cleared += 1;
+    }
+    for (const [id, group] of groups) {
+      const groupJobs = Array.from(jobs.values()).filter((job) => job.groupId === id);
+      if (groupJobs.length === 0) groups.delete(id);
+      else {
+        group.primaryJobIds = group.primaryJobIds.filter((jobId) => jobs.has(jobId));
+        group.followUpJobIds = group.followUpJobIds.filter((jobId) => jobs.has(jobId));
+      }
+    }
+    if (latestGroupId && !groups.has(latestGroupId)) latestGroupId = undefined;
+    updateDashboard();
+    return cleared;
+  };
 
   const updateDashboard = () => {
     if (!latestCtx?.hasUI) return;
 
-    const allJobs = Array.from(jobs.values()).sort((a, b) => a.createdAt - b.createdAt);
-    const activeGroupIds = new Set(
-      allJobs
-        .filter((job) => job.status === "queued" || job.status === "running")
-        .map((job) => job.groupId),
-    );
-
-    const visibleJobs = allJobs
-      .filter((job) => {
-        if (activeGroupIds.size > 0) return activeGroupIds.has(job.groupId);
-        return !dashboardCleared && job.groupId === latestGroupId;
-      })
+    const visibleJobs = Array.from(jobs.values())
+      .sort((a, b) => a.createdAt - b.createdAt)
       .slice(-8);
 
     if (visibleJobs.length === 0) {
@@ -407,7 +504,7 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    const lines = ["Subagents"];
+    const lines = ["Party"];
     const now = Date.now();
     for (const job of visibleJobs) {
       const elapsed = job.startedAt
@@ -433,7 +530,7 @@ export default function (pi: ExtensionAPI) {
     if (group.notify === "silent") return;
     if (group.notify === "on_error" && job.status !== "failed") return;
     if (group.notify === "on_each_done" || (group.notify === "on_error" && job.status === "failed")) {
-      latestCtx?.ui.notify(`Subagent ${job.name} ${job.status}.`, job.status === "failed" ? "error" : "info");
+      latestCtx?.ui.notify(`Party member ${job.name} ${job.status}.`, job.status === "failed" ? "error" : "info");
       pi.sendMessage({ customType: "subagents", content: summarizeJob(job), display: false, details: { jobId: job.id, groupId: group.id } }, { deliverAs: "nextTurn" });
     }
   };
@@ -444,8 +541,8 @@ export default function (pi: ExtensionAPI) {
     if (groupJobs.some((job) => job.status === "queued" || job.status === "running")) return;
     group.notifiedAllDone = true;
     const summary = groupJobs.map(summarizeJob).join("\n\n");
-    latestCtx?.ui.notify(`Subagent group ${group.id} finished.`, "info");
-    pi.sendMessage({ customType: "subagents", content: `Subagent group ${group.id} finished.\n\n${summary}`, display: false, details: { groupId: group.id } }, { deliverAs: "nextTurn" });
+    latestCtx?.ui.notify(`Party ${group.id} finished.`, "info");
+    pi.sendMessage({ customType: "subagents", content: `Party ${group.id} finished.\n\n${summary}`, display: false, details: { groupId: group.id } }, { deliverAs: "nextTurn" });
   };
 
   const startJob = async (job: JobRecord, preset: AgentPreset) => {
@@ -583,12 +680,15 @@ export default function (pi: ExtensionAPI) {
     const preset = presets[input.agent] ?? presets.generic;
     const id = shortId();
     const writeAccess = input.writeAccess ?? preset.writeAccess;
-    const personaIndex = group.primaryJobIds.length + group.followUpJobIds.length;
+    const persona = input.persona ?? allocateBuiltinPersona(group, jobs, groups);
+    if (!persona) throw new Error("All built-in party members are assigned. Run /subagents clear to free completed party members before delegating more party members.");
+    const explicitError = input.persona ? validateExplicitPersonas([input], jobs, groups) : undefined;
+    if (explicitError) throw new Error(explicitError);
     const job: JobRecord = {
       id,
       groupId: group.id,
       name: input.name ?? `${preset.name}-${id}`,
-      persona: input.persona ?? personaFor(personaIndex),
+      persona,
       agent: preset.name,
       task: input.task,
       cwd: path.resolve(input.cwd ?? process.cwd()),
@@ -682,33 +782,36 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("input", (_event, ctx) => {
     latestCtx = ctx;
-    if (!hasActiveJobs()) {
-      dashboardCleared = true;
-      updateDashboard();
-    }
+    updateDashboard();
   });
 
   pi.registerCommand("subagents", {
-    description: "Show background subagent jobs",
-    handler: async (_args, ctx) => {
+    description: "Show party member jobs, or clear completed jobs with: subagents clear",
+    handler: async (args, ctx) => {
       latestCtx = ctx;
-      const all = Array.from(jobs.values()).sort((a, b) => b.createdAt - a.createdAt);
-      if (all.length === 0) {
-        ctx.ui.notify("No subagent jobs yet.", "info");
+      const [action] = parseCommandArgs(args);
+      if (action === "clear") {
+        const cleared = clearInactiveJobs();
+        ctx.ui.notify(`Cleared ${cleared} inactive party member job(s).`, "info");
         return;
       }
-      ctx.ui.notify(all.slice(0, 10).map(summarizeJob).join("\n\n"), "info");
+      const all = Array.from(jobs.values()).sort((a, b) => b.createdAt - a.createdAt);
+      if (all.length === 0) {
+        ctx.ui.notify("No party member jobs yet. Use /subagents clear to clear completed jobs.", "info");
+        return;
+      }
+      ctx.ui.notify(`${all.slice(0, 10).map(summarizeJob).join("\n\n")}\n\nUse /subagents clear to clear completed jobs.`, "info");
     },
   });
 
   pi.registerTool({
     name: "delegate_subagents",
-    label: "Delegate Subagents",
-    description: "Start background Pi subagents for delegated tasks. Returns job IDs immediately; use check_subagents for progress.",
-    promptSnippet: "Start background subagents for parallel or delegated work.",
+    label: "Delegate Party",
+    description: "Start background Pi party members for delegated tasks. Returns job IDs immediately; use check_subagents for progress.",
+    promptSnippet: "Start background party members for parallel or delegated work.",
     promptGuidelines: [
-      "Use delegate_subagents when the user asks to delegate, parallelize, or run background subagents.",
-      "Use check_subagents to inspect background subagent progress before claiming delegated work is done.",
+      "Use delegate_subagents when the user asks to delegate, parallelize, or run background party members.",
+      "Use check_subagents to inspect party member progress before claiming delegated work is done.",
     ],
     parameters: DelegateParams,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -717,7 +820,7 @@ export default function (pi: ExtensionAPI) {
       const group: GroupRecord = {
         id: shortId(),
         createdAt: Date.now(),
-        reviewPolicy: params.reviewPolicy ?? "after_all",
+        reviewPolicy: params.reviewPolicy ?? "none",
         testPolicy: params.testPolicy ?? "none",
         mergePolicy: params.mergePolicy ?? "manual",
         notify: params.notify ?? "on_all_done",
@@ -725,20 +828,31 @@ export default function (pi: ExtensionAPI) {
         followUpJobIds: [],
         afterAllScheduled: false,
         notifiedAllDone: false,
+        personaOrder: shuffledPersonas(),
+        reservedPersonas: [],
         defaultModel: currentModel,
       };
+      const personaPlan = planTaskPersonas(params.tasks, group, jobs, groups);
+      if (personaPlan.error) {
+        return {
+          content: toolText(personaPlan.error),
+          details: { started: false, reason: personaPlan.error },
+          terminate: true,
+        };
+      }
+
+      group.reservedPersonas = personaPlan.reservedPersonas;
       groups.set(group.id, group);
       latestGroupId = group.id;
-      dashboardCleared = false;
 
       const integrateNote = group.mergePolicy === "integrate"
         ? "\n\nNote: mergePolicy=integrate creates integration guidance in v1; it does not automatically merge into the parent branch."
         : "";
 
-      const started = params.tasks.map((task: DelegateTask) => scheduleJob(group, { ...task, cwd: task.cwd ?? params.cwd ?? ctx.cwd }, "primary"));
+      const started = params.tasks.map((task: DelegateTask, index: number) => scheduleJob(group, { ...task, persona: personaPlan.personas[index], cwd: task.cwd ?? params.cwd ?? ctx.cwd }, "primary"));
       const summary = started.map((job) => `- ${job.name}: ${job.id}${job.writeAccess ? ` (${job.branch ?? "worktree pending"})` : ""}`).join("\n");
       return {
-        content: toolText(`Started subagent group ${group.id}.\n\n${summary}\n\nUse check_subagents to inspect progress.${integrateNote}`),
+        content: toolText(`Started party ${group.id}.\n\n${summary}\n\nUse check_subagents to inspect progress.${integrateNote}`),
         details: { groupId: group.id, jobIds: started.map((job) => job.id) },
         terminate: true,
       };
@@ -747,18 +861,18 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool({
     name: "check_subagents",
-    label: "Check Subagents",
-    description: "Check background subagent status, summaries, branches, and log paths.",
-    promptSnippet: "Inspect background subagent job progress and results.",
+    label: "Check Party",
+    description: "Check party member status, summaries, branches, and log paths.",
+    promptSnippet: "Inspect party member progress and results.",
     parameters: CheckParams,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       latestCtx = ctx;
       let selected = Array.from(jobs.values());
       if (params.jobId) selected = selected.filter((job) => job.id === params.jobId);
       if (params.groupId) selected = selected.filter((job) => job.groupId === params.groupId);
-      if (params.includeCompleted === false) selected = selected.filter((job) => job.status === "queued" || job.status === "running");
+      if (params.includeCompleted === false) selected = selected.filter(isActiveJob);
       selected.sort((a, b) => a.createdAt - b.createdAt);
-      if (selected.length === 0) return { content: toolText("No matching subagent jobs."), details: { jobs: [] } };
+      if (selected.length === 0) return { content: toolText("No matching party member jobs."), details: { jobs: [] } };
       return {
         content: toolText(selected.map(summarizeJob).join("\n\n---\n\n")),
         details: { jobs: selected.map(({ proc, cancel, ...job }) => job) },
@@ -768,12 +882,12 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool({
     name: "cancel_subagent",
-    label: "Cancel Subagent",
-    description: "Cancel one, a group, or all running background subagent jobs.",
+    label: "Cancel Party Member",
+    description: "Cancel one party member, a party, or all running party member jobs.",
     parameters: CancelParams,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       latestCtx = ctx;
-      let selected = Array.from(jobs.values()).filter((job) => job.status === "queued" || job.status === "running");
+      let selected = Array.from(jobs.values()).filter(isActiveJob);
       if (params.jobId) selected = selected.filter((job) => job.id === params.jobId);
       if (params.groupId) selected = selected.filter((job) => job.groupId === params.groupId);
       if (!params.all && !params.jobId && !params.groupId) {
@@ -785,7 +899,7 @@ export default function (pi: ExtensionAPI) {
         job.finishedAt = Date.now();
       }
       updateDashboard();
-      return { content: toolText(`Cancelled ${selected.length} subagent job(s).`), details: { cancelled: selected.map((job) => job.id) } };
+      return { content: toolText(`Cancelled ${selected.length} party member job(s).`), details: { cancelled: selected.map((job) => job.id) } };
     },
   });
 }
