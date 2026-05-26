@@ -27,6 +27,7 @@ interface AgentPreset {
   tools?: string[];
   model?: string;
   writeAccess: boolean;
+  includeUncommitted?: boolean;
 }
 
 interface DelegateTask {
@@ -126,6 +127,7 @@ const presets: Record<string, AgentPreset> = {
     description: "Verification and test diagnosis agent.",
     tools: ["read", "grep", "find", "ls", "bash"],
     writeAccess: true,
+    includeUncommitted: true,
     systemPrompt: [
       "You are a tester subagent for Pi.",
       "Run tests in your isolated git worktree so shell commands cannot mutate the parent checkout.",
@@ -151,6 +153,7 @@ const presets: Record<string, AgentPreset> = {
     description: "Heavyweight PR, branch, commit, and risky-change code reviewer.",
     tools: ["read", "grep", "find", "ls", "bash"],
     writeAccess: true,
+    includeUncommitted: true,
     systemPrompt: [
       "You are a code-reviewer subagent for Pi.",
       "Perform high-signal code review for PRs, branches, commits, or large/risky code changes in your isolated git worktree.",
@@ -325,10 +328,11 @@ async function copyUncommittedChanges(repoRoot: string, worktreePath: string): P
 }
 
 async function applyGitDiff(repoRoot: string, worktreePath: string, args: string[]): Promise<void> {
-  const diff = await gitOutput(repoRoot, args);
-  if (!diff) return;
+  const diffResult = await runCommand("git", args, repoRoot);
+  if (diffResult.code !== 0) throw new Error(diffResult.stderr || diffResult.stdout || `git ${args.join(" ")} failed`);
+  if (diffResult.stdout.length === 0) return;
 
-  const apply = await runCommand("git", ["apply", "--index", "--3way", "-"], worktreePath, diff);
+  const apply = await runCommand("git", ["apply", "--index", "--3way", "-"], worktreePath, diffResult.stdout);
   if (apply.code !== 0) throw new Error(apply.stderr || apply.stdout || `git apply ${args.join(" ")} failed`);
 }
 
@@ -593,7 +597,7 @@ export default function (pi: ExtensionAPI) {
       model: input.model ?? preset.model ?? group.defaultModel,
       tools: input.tools ?? preset.tools,
       writeAccess,
-      includeUncommitted: input.includeUncommitted ?? false,
+      includeUncommitted: input.includeUncommitted ?? preset.includeUncommitted ?? false,
       turns: 0,
       cost: 0,
     };
