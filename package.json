@@ -11,10 +11,10 @@
   "dependencies": {
     "@earendil-works/pi-ai": "^0.75.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "typebox": "^1.1.38"
+    "typebox": "^1.1.38",
+    "@earendil-works/pi-coding-agent": "^0.75.5"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.75.5",
     "@types/node": "^22.15.0",
     "tsx": "^4.20.0",
     "typescript": "^5.8.0"

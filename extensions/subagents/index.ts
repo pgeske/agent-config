@@ -27,6 +27,7 @@ interface AgentPreset {
   tools?: string[];
   model?: string;
   writeAccess: boolean;
+  includeUncommitted?: boolean;
 }
 
 interface DelegateTask {
@@ -38,6 +39,7 @@ interface DelegateTask {
   model?: string;
   tools?: string[];
   writeAccess?: boolean;
+  includeUncommitted?: boolean;
 }
 
 interface JobRecord {
@@ -58,6 +60,7 @@ interface JobRecord {
   model?: string;
   tools?: string[];
   writeAccess: boolean;
+  includeUncommitted: boolean;
   lastEvent?: string;
   summary?: string;
   error?: string;
@@ -87,7 +90,7 @@ const presets: Record<string, AgentPreset> = {
   scout: {
     name: "scout",
     description: "Fast read-only codebase reconnaissance.",
-    tools: ["read", "grep", "find", "ls", "bash"],
+    tools: ["read", "grep", "find", "ls"],
     writeAccess: false,
     systemPrompt: [
       "You are a scout subagent for Pi.",
@@ -123,9 +126,11 @@ const presets: Record<string, AgentPreset> = {
     name: "tester",
     description: "Verification and test diagnosis agent.",
     tools: ["read", "grep", "find", "ls", "bash"],
-    writeAccess: false,
+    writeAccess: true,
+    includeUncommitted: true,
     systemPrompt: [
       "You are a tester subagent for Pi.",
+      "Run tests in your isolated git worktree so shell commands cannot mutate the parent checkout.",
       "Run or inspect relevant verification for the delegated work.",
       "Do not modify files unless explicitly instructed.",
       "Return pass/fail status, commands run, failure diagnostics, and recommended fixes.",
@@ -134,7 +139,7 @@ const presets: Record<string, AgentPreset> = {
   reviewer: {
     name: "reviewer",
     description: "Read-only code and requirements reviewer.",
-    tools: ["read", "grep", "find", "ls", "bash"],
+    tools: ["read", "grep", "find", "ls"],
     writeAccess: false,
     systemPrompt: [
       "You are a reviewer subagent for Pi.",
@@ -147,11 +152,12 @@ const presets: Record<string, AgentPreset> = {
     name: "code-reviewer",
     description: "Heavyweight PR, branch, commit, and risky-change code reviewer.",
     tools: ["read", "grep", "find", "ls", "bash"],
-    writeAccess: false,
+    writeAccess: true,
+    includeUncommitted: true,
     systemPrompt: [
       "You are a code-reviewer subagent for Pi.",
-      "Perform high-signal code review for PRs, branches, commits, or large/risky code changes.",
-      "Do not modify files, commit, push, merge, or run destructive commands.",
+      "Perform high-signal code review for PRs, branches, commits, or large/risky code changes in your isolated git worktree.",
+      "Do not modify files intentionally, commit, push, merge, or run destructive commands.",
       "Prefer reviewing the actual diff against the correct base; for an open PR, determine its base with gh pr view and review against origin/<base>.",
       "When available, use Pi's /codex-review workflow or codex exec review for non-trivial PRs or when explicitly requested.",
       "Treat Codex output as advisory: verify every accepted finding against the real code path and reject speculative, low-impact, style-only, or over-complicated findings.",
@@ -191,6 +197,7 @@ const TaskSchema = Type.Object({
   model: Type.Optional(Type.String({ description: "Optional Pi model selector" })),
   tools: Type.Optional(Type.Array(Type.String(), { description: "Optional tool list override" })),
   writeAccess: Type.Optional(Type.Boolean({ description: "Override preset write access. Write access requires a git worktree." })),
+  includeUncommitted: Type.Optional(Type.Boolean({ description: "Apply staged, unstaged, and untracked parent checkout changes into the subagent worktree. Use for local WIP testing/review." })),
 });
 
 const DelegateParams = Type.Object({
@@ -278,13 +285,14 @@ function getPiInvocation(args: string[]): { command: string; args: string[] } {
   return { command: "pi", args };
 }
 
-async function runCommand(command: string, args: string[], cwd: string): Promise<{ code: number; stdout: string; stderr: string }> {
+async function runCommand(command: string, args: string[], cwd: string, stdin?: string): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const proc = spawn(command, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const proc = spawn(command, args, { cwd, stdio: [stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
-    proc.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
-    proc.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    if (stdin !== undefined) proc.stdin?.end(stdin);
+    proc.stdout?.on("data", (chunk) => { stdout += chunk.toString(); });
+    proc.stderr?.on("data", (chunk) => { stderr += chunk.toString(); });
     proc.on("error", (error) => resolve({ code: 1, stdout, stderr: error.message }));
     proc.on("close", (code) => resolve({ code: code ?? 0, stdout, stderr }));
   });
@@ -306,13 +314,48 @@ async function createWorktree(cwd: string, job: JobRecord): Promise<void> {
   job.branch = `subagents/${sessionSlug}/${job.id}-${jobSlug}`;
   job.worktreePath = path.join(worktreeRoot, `${job.id}-${jobSlug}`);
   await gitOutput(repoRoot, ["worktree", "add", job.worktreePath, "-b", job.branch, "HEAD"]);
+
+  if (job.includeUncommitted) {
+    job.lastEvent = "copying uncommitted changes";
+    await copyUncommittedChanges(repoRoot, job.worktreePath);
+  }
+}
+
+async function copyUncommittedChanges(repoRoot: string, worktreePath: string): Promise<void> {
+  await applyGitDiff(repoRoot, worktreePath, ["diff", "--binary", "--staged"], true);
+  await applyGitDiff(repoRoot, worktreePath, ["diff", "--binary"], false);
+  await copyUntrackedFiles(repoRoot, worktreePath);
+}
+
+async function applyGitDiff(repoRoot: string, worktreePath: string, args: string[], staged: boolean): Promise<void> {
+  const diffResult = await runCommand("git", args, repoRoot);
+  if (diffResult.code !== 0) throw new Error(diffResult.stderr || diffResult.stdout || `git ${args.join(" ")} failed`);
+  if (diffResult.stdout.length === 0) return;
+
+  const applyArgs = staged ? ["apply", "--index", "--3way", "-"] : ["apply", "--3way", "-"];
+  const apply = await runCommand("git", applyArgs, worktreePath, diffResult.stdout);
+  if (apply.code !== 0) throw new Error(apply.stderr || apply.stdout || `git apply ${args.join(" ")} failed`);
+}
+
+async function copyUntrackedFiles(repoRoot: string, worktreePath: string): Promise<void> {
+  const output = await gitOutput(repoRoot, ["ls-files", "--others", "--exclude-standard", "-z"]);
+  if (!output) return;
+
+  for (const relativePath of output.split("\0").filter(Boolean)) {
+    const source = path.join(repoRoot, relativePath);
+    const destination = path.join(worktreePath, relativePath);
+    const stat = await fs.promises.lstat(source);
+    if (!stat.isFile()) continue;
+    await fs.promises.mkdir(path.dirname(destination), { recursive: true });
+    await fs.promises.copyFile(source, destination);
+  }
 }
 
 async function writePromptFile(job: JobRecord, preset: AgentPreset): Promise<{ dir: string; file: string }> {
   const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "pi-subagent-prompt-"));
   const file = path.join(dir, `${job.id}.md`);
   const worktreeNote = job.writeAccess
-    ? `\nYou are running in an isolated worktree. Branch: ${job.branch}. Worktree: ${job.worktreePath}. Commit finished code changes before reporting completion.\n`
+    ? `\nYou are running in an isolated worktree. Branch: ${job.branch}. Worktree: ${job.worktreePath}.${job.includeUncommitted ? " Staged, unstaged, and untracked parent changes were copied into this worktree." : ""} Commit finished code changes before reporting completion.\n`
     : "\nThis is a read-only job. Do not modify files.\n";
   const prompt = `${preset.systemPrompt}\n${worktreeNote}\nYour parent orchestrator expects a concise final summary.`;
   await fs.promises.writeFile(file, prompt, { encoding: "utf8", mode: 0o600 });
@@ -555,6 +598,7 @@ export default function (pi: ExtensionAPI) {
       model: input.model ?? preset.model ?? group.defaultModel,
       tools: input.tools ?? preset.tools,
       writeAccess,
+      includeUncommitted: input.includeUncommitted ?? preset.includeUncommitted ?? false,
       turns: 0,
       cost: 0,
     };

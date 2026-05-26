@@ -9,6 +9,7 @@ import {
   loadConfigFromObject,
   mcpToolResultToPiToolResult,
   normalizeMcpContent,
+  withTimeout,
 } from "../extensions/mcp-bridge/index.ts";
 
 describe("mcp-bridge", () => {
@@ -91,6 +92,13 @@ describe("mcp-bridge", () => {
           text: 'Structured content:\n{"ok":true}',
         },
       ],
+    );
+  });
+
+  it("bounds slow MCP operations with a timeout", async () => {
+    await assert.rejects(
+      withTimeout(new Promise(() => undefined), "testing slow operation", 1),
+      /Timed out after 1ms while testing slow operation/,
     );
   });
 

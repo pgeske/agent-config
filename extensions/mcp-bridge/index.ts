@@ -51,6 +51,7 @@ type PiToolResult = {
 
 const DEFAULT_CONFIG_PATH = "~/.pi/agent/mcp.json";
 const MAX_RESULT_TEXT_BYTES = 50 * 1024;
+const MCP_OPERATION_TIMEOUT_MS = 10_000;
 
 export function expandEnv(value: string, env: Env = process.env): string {
   return value.replace(/\$\{([A-Z0-9_]+)\}/gi, (_match, name: string) => {
@@ -228,17 +229,44 @@ export async function connectServer(server: McpServerConfig): Promise<BridgeConn
     requestInit: server.headers ? { headers: server.headers } : undefined,
   });
 
-  await client.connect(transport);
+  try {
+    await withTimeout(client.connect(transport), `connecting to MCP server ${server.name}`);
 
-  const tools: Tool[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await client.listTools(cursor ? { cursor } : undefined);
-    tools.push(...page.tools);
-    cursor = page.nextCursor;
-  } while (cursor);
+    const tools: Tool[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await withTimeout(
+        client.listTools(cursor ? { cursor } : undefined),
+        `listing tools from MCP server ${server.name}`,
+      );
+      tools.push(...page.tools);
+      cursor = page.nextCursor;
+    } while (cursor);
 
-  return { server, client, transport, tools };
+    return { server, client, transport, tools };
+  } catch (error) {
+    await transport.close().catch(() => undefined);
+    throw error;
+  }
+}
+
+export function withTimeout<T>(promise: Promise<T>, operation: string, timeoutMs = MCP_OPERATION_TIMEOUT_MS): Promise<T> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const timer = setTimeout(() => {
+      rejectPromise(new Error(`Timed out after ${timeoutMs}ms while ${operation}`));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolvePromise(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        rejectPromise(error);
+      },
+    );
+  });
 }
 
 function registerMcpTool(pi: ExtensionAPI, connection: BridgeConnection, tool: Tool, usedToolNames: Set<string>): void {

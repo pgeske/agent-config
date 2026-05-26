@@ -366,8 +366,7 @@ if [[ -d "$EXTENSIONS_DIR" && ${#extension_targets[@]} -gt 0 ]]; then
         created=$((created + 1))
       fi
     else
-      printf '  ! extension dependencies not installed; run npm install in %s\n' "$ROOT_DIR" >&2
-      exit 1
+      printf '  ! extension dependencies not installed; run npm install in %s before starting Pi with these extensions\n' "$ROOT_DIR" >&2
     fi
 
     if [[ $prune -eq 1 ]]; then
