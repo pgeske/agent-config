@@ -261,7 +261,7 @@ function statusBadge(status: JobStatus, color?: (name: any, text: string) => str
   }
 }
 
-const PERSONAS = ["alyosha", "killua", "takkun", "vash", "guts"];
+const PERSONAS = ["Alyosha", "Killua", "Takkun", "Vash", "Guts"];
 
 function personaFor(index: number): string {
   return PERSONAS[index % PERSONAS.length];
