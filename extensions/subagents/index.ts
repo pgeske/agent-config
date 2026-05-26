@@ -84,6 +84,7 @@ interface GroupRecord {
   afterAllScheduled: boolean;
   notifiedAllDone: boolean;
   personaOrder: string[];
+  reservedPersonas: string[];
   defaultModel?: string;
 }
 
@@ -277,22 +278,28 @@ function normalizePersona(persona: string): string {
   return persona.trim().toLowerCase();
 }
 
-function assignedPersonaKeys(jobs: Map<string, JobRecord>): Set<string> {
-  return new Set(Array.from(jobs.values(), (job) => normalizePersona(job.persona)));
+function assignedPersonaKeys(jobs: Map<string, JobRecord>, groups?: Map<string, GroupRecord>): Set<string> {
+  const assigned = new Set(Array.from(jobs.values(), (job) => normalizePersona(job.persona)));
+  if (groups) {
+    for (const group of groups.values()) {
+      for (const persona of group.reservedPersonas) assigned.add(normalizePersona(persona));
+    }
+  }
+  return assigned;
 }
 
-function availablePersonas(group: GroupRecord, jobs: Map<string, JobRecord>): string[] {
-  const assigned = assignedPersonaKeys(jobs);
+function availablePersonas(group: GroupRecord, jobs: Map<string, JobRecord>, groups?: Map<string, GroupRecord>): string[] {
+  const assigned = assignedPersonaKeys(jobs, groups);
   const personas = group.personaOrder.length > 0 ? group.personaOrder : PERSONAS;
   return personas.filter((persona) => !assigned.has(normalizePersona(persona)));
 }
 
-function allocateBuiltinPersona(group: GroupRecord, jobs: Map<string, JobRecord>): string | undefined {
-  return availablePersonas(group, jobs)[0];
+function allocateBuiltinPersona(group: GroupRecord, jobs: Map<string, JobRecord>, groups: Map<string, GroupRecord>): string | undefined {
+  return group.reservedPersonas.shift() ?? availablePersonas(group, jobs, groups)[0];
 }
 
-function validateExplicitPersonas(tasks: DelegateTask[], jobs: Map<string, JobRecord>): string | undefined {
-  const assigned = assignedPersonaKeys(jobs);
+function validateExplicitPersonas(tasks: DelegateTask[], jobs: Map<string, JobRecord>, groups?: Map<string, GroupRecord>): string | undefined {
+  const assigned = assignedPersonaKeys(jobs, groups);
   const requested = new Set<string>();
   for (const task of tasks) {
     if (!task.persona) continue;
@@ -315,12 +322,12 @@ function policyFollowUpPersonaCount(primaryTaskCount: number, group: GroupRecord
   return count;
 }
 
-function planTaskPersonas(tasks: DelegateTask[], group: GroupRecord, jobs: Map<string, JobRecord>): { personas: string[]; error?: string } {
-  const explicitError = validateExplicitPersonas(tasks, jobs);
-  if (explicitError) return { personas: [], error: explicitError };
+function planTaskPersonas(tasks: DelegateTask[], group: GroupRecord, jobs: Map<string, JobRecord>, groups: Map<string, GroupRecord>): { personas: string[]; reservedPersonas: string[]; error?: string } {
+  const explicitError = validateExplicitPersonas(tasks, jobs, groups);
+  if (explicitError) return { personas: [], reservedPersonas: [], error: explicitError };
 
   const explicit = new Set(tasks.filter((task) => task.persona).map((task) => normalizePersona(task.persona!)));
-  const available = availablePersonas(group, jobs).filter((persona) => !explicit.has(normalizePersona(persona)));
+  const available = availablePersonas(group, jobs, groups).filter((persona) => !explicit.has(normalizePersona(persona)));
   const implicitCount = tasks.filter((task) => !task.persona).length;
   const reservedFollowUps = policyFollowUpPersonaCount(tasks.length, group);
   const neededCount = implicitCount + reservedFollowUps;
@@ -330,12 +337,14 @@ function planTaskPersonas(tasks: DelegateTask[], group: GroupRecord, jobs: Map<s
     const reason = allAssigned
       ? "All built-in party members are assigned"
       : `Insufficient built-in party members are available (${available.length} available, ${neededCount} needed${followUpNote})`;
-    return { personas: [], error: `${reason}. Run /subagents clear to free completed party members before delegating more party members.` };
+    return { personas: [], reservedPersonas: [], error: `${reason}. Run /subagents clear to free completed party members before delegating more party members.` };
   }
 
   let implicitIndex = 0;
+  const personas = tasks.map((task) => task.persona ? task.persona.trim() : available[implicitIndex++]);
   return {
-    personas: tasks.map((task) => task.persona ? task.persona.trim() : available[implicitIndex++]),
+    personas,
+    reservedPersonas: available.slice(implicitIndex, implicitIndex + reservedFollowUps),
   };
 }
 
@@ -670,9 +679,9 @@ export default function (pi: ExtensionAPI) {
     const preset = presets[input.agent] ?? presets.generic;
     const id = shortId();
     const writeAccess = input.writeAccess ?? preset.writeAccess;
-    const persona = input.persona ?? allocateBuiltinPersona(group, jobs);
+    const persona = input.persona ?? allocateBuiltinPersona(group, jobs, groups);
     if (!persona) throw new Error("All built-in party members are assigned. Run /subagents clear to free completed party members before delegating more party members.");
-    const explicitError = input.persona ? validateExplicitPersonas([input], jobs) : undefined;
+    const explicitError = input.persona ? validateExplicitPersonas([input], jobs, groups) : undefined;
     if (explicitError) throw new Error(explicitError);
     const job: JobRecord = {
       id,
@@ -819,9 +828,10 @@ export default function (pi: ExtensionAPI) {
         afterAllScheduled: false,
         notifiedAllDone: false,
         personaOrder: shuffledPersonas(),
+        reservedPersonas: [],
         defaultModel: currentModel,
       };
-      const personaPlan = planTaskPersonas(params.tasks, group, jobs);
+      const personaPlan = planTaskPersonas(params.tasks, group, jobs, groups);
       if (personaPlan.error) {
         return {
           content: toolText(personaPlan.error),
@@ -830,6 +840,7 @@ export default function (pi: ExtensionAPI) {
         };
       }
 
+      group.reservedPersonas = personaPlan.reservedPersonas;
       groups.set(group.id, group);
       latestGroupId = group.id;
 
