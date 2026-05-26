@@ -322,17 +322,18 @@ async function createWorktree(cwd: string, job: JobRecord): Promise<void> {
 }
 
 async function copyUncommittedChanges(repoRoot: string, worktreePath: string): Promise<void> {
-  await applyGitDiff(repoRoot, worktreePath, ["diff", "--binary", "--staged"]);
-  await applyGitDiff(repoRoot, worktreePath, ["diff", "--binary"]);
+  await applyGitDiff(repoRoot, worktreePath, ["diff", "--binary", "--staged"], true);
+  await applyGitDiff(repoRoot, worktreePath, ["diff", "--binary"], false);
   await copyUntrackedFiles(repoRoot, worktreePath);
 }
 
-async function applyGitDiff(repoRoot: string, worktreePath: string, args: string[]): Promise<void> {
+async function applyGitDiff(repoRoot: string, worktreePath: string, args: string[], staged: boolean): Promise<void> {
   const diffResult = await runCommand("git", args, repoRoot);
   if (diffResult.code !== 0) throw new Error(diffResult.stderr || diffResult.stdout || `git ${args.join(" ")} failed`);
   if (diffResult.stdout.length === 0) return;
 
-  const apply = await runCommand("git", ["apply", "--index", "--3way", "-"], worktreePath, diffResult.stdout);
+  const applyArgs = staged ? ["apply", "--index", "--3way", "-"] : ["apply", "--3way", "-"];
+  const apply = await runCommand("git", applyArgs, worktreePath, diffResult.stdout);
   if (apply.code !== 0) throw new Error(apply.stderr || apply.stdout || `git apply ${args.join(" ")} failed`);
 }
 
