@@ -319,8 +319,8 @@ async function createWorktree(cwd: string, job: JobRecord): Promise<void> {
 }
 
 async function copyUncommittedChanges(repoRoot: string, worktreePath: string): Promise<void> {
-  await applyGitDiff(repoRoot, worktreePath, ["diff", "--binary"]);
   await applyGitDiff(repoRoot, worktreePath, ["diff", "--binary", "--staged"]);
+  await applyGitDiff(repoRoot, worktreePath, ["diff", "--binary"]);
   await copyUntrackedFiles(repoRoot, worktreePath);
 }
 
