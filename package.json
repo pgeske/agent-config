@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx tests/*.test.ts"
+    "test": "node --test --import tsx tests/*.test.ts",
+    "sync": "node scripts/sync.mjs",
+    "sync:dry-run": "node scripts/sync.mjs --dry-run"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.75.5",
