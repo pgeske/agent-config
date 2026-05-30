@@ -14,7 +14,7 @@ vim.opt.rtp:prepend(lazypath)
 require("lazy").setup({
 	-- Telescope Setup
     { 'nvim-telescope/telescope-ui-select.nvim' },
-    { 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' },
+    { 'nvim-telescope/telescope-fzf-native.nvim', build = 'make', enabled = vim.fn.executable('make') == 1 },
     { "nvim-telescope/telescope.nvim",   tag = "0.1.8",    dependencies = { "nvim-lua/plenary.nvim" } },
     { "nvim-treesitter/nvim-treesitter", run = ":TSUpdate" },
     { "nvim-treesitter/playground" },
@@ -52,7 +52,7 @@ require("lazy").setup({
     { "simrat39/rust-tools.nvim" },
     {
         "nvim-tree/nvim-tree.lua",
-        version = "*",
+        branch = vim.fn.has("nvim-0.10") == 1 and "master" or "compat-nvim-0.9",
         lazy = false,
         dependencies = {
             "nvim-tree/nvim-web-devicons",

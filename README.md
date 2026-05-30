@@ -49,7 +49,7 @@ The sync command is idempotent. It backs up replaced files as `.bak-<timestamp>`
 
 - `dotfiles/tmux/tmux.conf` -> `~/.tmux.conf`
 - `dotfiles/tmux/tmux.conf.local` -> `~/.tmux.conf.local`
-- `dotfiles/nvim/` -> `~/.config/nvim/`
+- `dotfiles/nvim/` -> `~/.config/nvim/` on macOS/Linux, `%LOCALAPPDATA%\nvim\` on Windows
 - `dotfiles/ghostty/config` -> `~/.config/ghostty/config`
 - `AGENTS.md` -> `~/.pi/agent/AGENTS.md`
 

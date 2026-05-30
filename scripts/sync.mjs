@@ -56,11 +56,32 @@ function parseArgs(argv) {
     }
   }
 
-  options.home = resolveUserPath(options.home, os.homedir());
+  const currentHome = path.resolve(os.homedir());
+  options.home = resolveUserPath(options.home, currentHome);
   options.configHome = resolveUserPath(options.configHome ?? process.env.XDG_CONFIG_HOME ?? path.join(options.home, ".config"), options.home);
+  options.localAppData = resolveUserPath(defaultLocalAppData(options.home, currentHome), options.home);
   options.piAgentDir = resolveUserPath(options.piAgentDir ?? process.env.PI_CODING_AGENT_DIR ?? path.join(options.home, ".pi", "agent"), options.home);
   if (options.mode === "auto") options.mode = process.platform === "win32" ? "copy" : "symlink";
   return options;
+}
+
+function defaultLocalAppData(home, currentHome) {
+  if (process.platform === "win32" && pathsEqual(home, currentHome) && process.env.LOCALAPPDATA) {
+    return process.env.LOCALAPPDATA;
+  }
+  return path.join(home, "AppData", "Local");
+}
+
+function pathsEqual(left, right) {
+  const resolvedLeft = path.resolve(left);
+  const resolvedRight = path.resolve(right);
+  if (process.platform === "win32") return resolvedLeft.toLowerCase() === resolvedRight.toLowerCase();
+  return resolvedLeft === resolvedRight;
+}
+
+function neovimConfigTarget(options, platform = process.platform) {
+  if (platform === "win32") return path.join(options.localAppData, "nvim");
+  return path.join(options.configHome, "nvim");
 }
 
 function requireValue(argv, index, flag) {
@@ -99,7 +120,7 @@ function managedItems(options) {
       label: "Neovim config",
       type: "dir",
       source: path.join(repoRoot, "dotfiles", "nvim"),
-      target: path.join(options.configHome, "nvim"),
+      target: neovimConfigTarget(options),
     },
     {
       label: "Ghostty config",
@@ -299,4 +320,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
   });
 }
 
-export { managedItems, parseArgs, renderResults, sync };
+export { managedItems, neovimConfigTarget, parseArgs, renderResults, sync };
