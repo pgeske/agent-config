@@ -1,42 +1,75 @@
 # Agent Config
 
-Shared agent configuration, reusable skills, and Pi extensions.
+Personal Pi package plus machine setup dotfiles.
 
-## Structure
+## Goals
 
-- `AGENTS.md` - Shared instructions source installed into configured AGENTS targets
-- `skills/` - Reusable skills and capabilities
-- `extensions/` - Reusable Pi extensions, as either `*.ts` files or directories with `index.ts`
+- Install Pi once, then install this repo as a Pi package.
+- Keep Pi extensions, skills, prompts, themes, and global `AGENTS.md` in one place.
+- Sync editor/terminal dotfiles on a fresh machine or an existing machine with the same command.
+- Keep secrets and machine-local values out of git.
 
-## Usage
+## Fresh machine
 
-### Source of truth
+```bash
+curl -fsSL https://pi.dev/install.sh | sh
+pi install git:git@github.com:pgeske/agent-config
+pi
+/config-sync --dry-run
+/config-sync
+```
 
-Create and edit shared agent config only in this repo:
+You can also run the sync script directly from the package checkout:
 
-- `~/projects/agent-config/AGENTS.md`
-- `~/projects/agent-config/skills/<skill-name>`
-- `~/projects/agent-config/extensions/<extension-name>`
+```bash
+node ~/.pi/agent/git/github.com/pgeske/agent-config/scripts/sync.mjs --dry-run
+node ~/.pi/agent/git/github.com/pgeske/agent-config/scripts/sync.mjs
+```
 
-### Tooling
+## Updating later
 
-- Install managed config, all skills, and Pi extensions:
-  - `./install.sh`
-- Install managed config, Pi extensions, plus one or more named skills:
-  - `./install.sh my-skill another-skill`
-- Replace mismatched managed targets:
-  - `./install.sh --force`
-- Remove stale agent-config-managed skill links while installing:
-  - `./install.sh --prune`
+```bash
+pi update --extensions
+pi
+/config-sync --dry-run
+/config-sync
+```
 
-OpenClaw skill targets are installed as copied directories, not symlinks, so rerunning `./install.sh` overwrites existing skill copies there automatically.
+The sync command is idempotent. It backs up replaced files as `.bak-<timestamp>` unless `--no-backup` is passed.
 
-Pi extension dependencies are managed by the root `package.json`; run `npm install` in this repo after cloning or updating extension dependencies. If `npm test` or `npm run typecheck` cannot find `tsx`, install dependencies first with `npm install`.
+## What Pi loads from this package
+
+- `AGENTS.md` - personal global instructions, synced to `~/.pi/agent/AGENTS.md`
+- `extensions/` - Pi extensions and slash commands
+- `skills/` - reusable skills
+- `prompts/` - prompt templates, if present
+- `themes/` - Pi themes, if present
+
+## Dotfiles synced by `/config-sync`
+
+- `dotfiles/tmux/tmux.conf` -> `~/.tmux.conf`
+- `dotfiles/tmux/tmux.conf.local` -> `~/.tmux.conf.local`
+- `dotfiles/nvim/` -> `~/.config/nvim/`
+- `dotfiles/ghostty/config` -> `~/.config/ghostty/config`
+- `AGENTS.md` -> `~/.pi/agent/AGENTS.md`
+
+By default, sync uses symlinks on macOS/Linux and copies on Windows. Override with `--mode symlink` or `--mode copy`.
+
+## Testing safely
+
+Run against a fake home instead of your real profile:
+
+```bash
+npm run sync:dry-run -- --home /tmp/agent-home --config-home /tmp/agent-home/.config --pi-agent-dir /tmp/agent-home/.pi/agent --mode copy
+npm run sync -- --home /tmp/agent-home --config-home /tmp/agent-home/.config --pi-agent-dir /tmp/agent-home/.pi/agent --mode copy
+```
+
+## Development
+
+```bash
+npm install
+npm run typecheck
+npm test
+```
 
 MCP bridge secrets belong in environment variables or local untracked config such as `~/.pi/agent/mcp.json`; use `.env.example` as a template only.
-
-Pi Codex review support is available through the `/codex-review` command after install. It can review the current PR/branch, uncommitted changes, a commit, or a shared GitHub PR URL; it requires the Codex CLI and GitHub CLI for PR URL mode.
-
-### Target config
-
-Edit `targets.yaml` for skill destination directories and Pi extension destinations. Shared AGENTS targets are managed directly by `install.sh`.
