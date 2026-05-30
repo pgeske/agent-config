@@ -170,7 +170,7 @@ require("lazy").setup({
     { "catppuccin/nvim", name = "catppuccin", priority = 1000 },
 })
 
-vim.cmd("colorscheme catppuccin")
+vim.cmd("colorscheme catppuccin-frappe")
 
 -- things that apparently need to be setup asap after install
 require("bufferline").setup({})
