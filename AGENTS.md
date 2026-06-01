@@ -32,7 +32,6 @@ The user needs short, scannable responses. Follow these rules strictly:
 - Use `notes-workflow` for note capture requests; in a second-brain vault this means creating a raw capture, not editing wiki pages.
 - Use `wiki-maintainer` for all raw-to-wiki ingestion, wiki organization, cross-linking, and knowledge-base updates.
 - Use the `gather-context` skill before broad searches when the request may depend on shell history, notes, or repos outside the current workspace.
-- Use the `shopping-research` skill for product discovery, comparisons, and recommendation requests when the user wants help finding a good item, narrowing options, or understanding what to buy.
 - Use the `twitter` skill for X/Twitter lookups or actions instead of ad hoc browsing or raw HTTP requests.
 - For command requests, check shell history before help pages or web docs when prior local usage is plausible.
 - For private or project-specific questions, prefer targeted notes and repo resolution over broad home-directory search or public web lookup.
