@@ -1,0 +1,17 @@
+{
+  "provider": "auto",
+  "webSearch": {
+    "enabled": true
+  },
+  "workflow": "none",
+  "allowBrowserCookies": false,
+  "githubClone": {
+    "enabled": false
+  },
+  "youtube": {
+    "enabled": false
+  },
+  "video": {
+    "enabled": false
+  }
+}

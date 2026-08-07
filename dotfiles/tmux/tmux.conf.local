@@ -2,6 +2,7 @@ display-message "Sourced .tmux.conf.local successfully"
 
 # Enable tmux extended keys so modified Enter and other CSI-u keys work in pi.
 set -g extended-keys on
+set -g extended-keys-format csi-u
 
 # : << EOF
 # https://github.com/gpakosz/.tmux
@@ -497,8 +498,8 @@ unbind Right
 
 set-option -g allow-passthrough on
 
-# Keep tmux mouse mode on so scrolling enters tmux copy/scrollback mode.
-# Note: this can make terminal URL detection require the terminal's mouse-bypass modifier.
+# Keep tmux mouse mode on so mouse scrolling enters tmux scrollback/copy mode.
+# Ghostty link opening may require the terminal's mouse-bypass modifier.
 set -g mouse on
 
 # Advertise hyperlink support for tools that emit OSC 8 links.
@@ -511,32 +512,44 @@ set -g history-limit 10000
 setw -g mode-keys vi
 
 # Bind keys for entering copy mode
-bind -T copy-mode-vi v begin-selection
-bind -T copy-mode-vi y copy-selection
+bind -T copy-mode-vi v send -X begin-selection
+bind -T copy-mode-vi y send -X copy-selection
 
 # Enable scrolling in copy mode
 bind -n WheelUpPane if-shell -Ft= "#{mouse_any_flag}" "send-keys -M" "if-shell -Ft= '#{pane_in_mode}' 'send-keys -M' 'copy-mode -e; send-keys -M'"
 bind -n WheelDownPane if-shell -Ft= "#{mouse_any_flag}" "send-keys -M" "send-keys -M"
 
 # Plugin Management
-set -g @plugin 'tmux-plugins/tpm'
-set -g @plugin 'dracula/tmux'
-set -g @dracula-plugins "battery time network"
+# Disabled: dracula/tmux was flattening the window-status theme in new tmux
+# sessions and racing the Pi tmux notification installer. Keep Pi notifications
+# via the delayed tmux-notify install below instead.
+# set -g @plugin 'tmux-plugins/tpm'
+# set -g @plugin 'dracula/tmux'
+# set -g @dracula-plugins "battery time network"
+# run '~/.tmux/plugins/tpm/tpm'
 
-
-# Initialize TMUX plugin manager.
-run '~/.tmux/plugins/tpm/tpm'
-
-# Disable the old active-pane border label/highlight. Keep this after plugins because
-# theme/plugin startup can otherwise restore pane-border-status/format.
+# Keep the tmux chrome consistent with Pi's Catppuccin Frappé palette.
+# These explicit overrides must stay after the theme template and notification
+# hooks so newly created windows use the same styling as existing ones.
 set-window-option -g pane-border-status off
 set-window-option -g pane-border-format ''
-
-# Keep adjacent window tabs flush with light padding inside each tab.
+set-window-option -g pane-border-style 'fg=#51576d,bg=#303446'
+set-window-option -g pane-active-border-style 'fg=#8caaee,bg=#303446'
+set-option -g window-style 'fg=#c6d0f5,bg=#303446'
+set-option -g window-active-style 'fg=#c6d0f5,bg=#303446'
+set-option -g status-style 'fg=#c6d0f5,bg=#303446,none'
+set-option -g status-left ''
+set-option -g status-left-style 'fg=#c6d0f5,bg=#303446,none'
+set-option -g status-right ''
 set-window-option -g window-status-separator ''
-set-window-option -g window-status-format '#[fg=#f8f8f2,bg=#44475a] #I #W#{?@pi_notify_label, #{@pi_notify_label},} '
-set-window-option -g window-status-current-format '#[fg=#f8f8f2,bg=#6272a4,bold] #I #W#{?@pi_notify_label, #{@pi_notify_label},} '
-run -b 'sleep 6; tmux set-window-option -g pane-border-status off \; set-window-option -g pane-border-format "" \; set-window-option -g window-status-separator "" \; set-window-option -g window-status-format "#[fg=#f8f8f2,bg=#44475a] ##I ##W##{?@pi_notify_label, ##{@pi_notify_label},} " \; set-window-option -g window-status-current-format "#[fg=#f8f8f2,bg=#6272a4,bold] ##I ##W##{?@pi_notify_label, ##{@pi_notify_label},} "; tmux list-windows -a -F "##{session_name}:##{window_index}" | while read w; do tmux set-window-option -t "$w" pane-border-status off \; set-window-option -t "$w" pane-border-format ""; done'
+set-window-option -g window-status-activity-style 'fg=#c6d0f5,bg=#51576d,none'
+set-window-option -g window-status-last-style 'fg=#c6d0f5,bg=#51576d,none'
+set-window-option -g window-status-bell-style 'fg=#303446,bg=#e5c890,bold'
+set-window-option -g window-status-format '#[fg=#c6d0f5,bg=#51576d,none] #I #W#{?@pi_notify_label, #{@pi_notify_label},} '
+set-window-option -g window-status-current-format '#[fg=#303446,bg=#8caaee,bold] #I #W#{?@pi_notify_label, #{@pi_notify_label},} '
+# Re-apply after startup because theme/plugin hooks can overwrite window status
+# formats after ~/.tmux.conf.local is first sourced.
+run -b 'sleep 1; tmux set-option -g status-style "fg=#c6d0f5,bg=#303446,none" \; set-option -g status-left "" \; set-option -g status-left-style "fg=#c6d0f5,bg=#303446,none" \; set-option -g status-right "" \; set-option -g window-style "fg=#c6d0f5,bg=#303446" \; set-option -g window-active-style "fg=#c6d0f5,bg=#303446" \; set-window-option -g pane-border-status off \; set-window-option -g pane-border-format "" \; set-window-option -g pane-border-style "fg=#51576d,bg=#303446" \; set-window-option -g pane-active-border-style "fg=#8caaee,bg=#303446" \; set-window-option -g window-status-separator "" \; set-window-option -g window-status-activity-style "fg=#c6d0f5,bg=#51576d,none" \; set-window-option -g window-status-last-style "fg=#c6d0f5,bg=#51576d,none" \; set-window-option -g window-status-bell-style "fg=#303446,bg=#e5c890,bold" \; set-window-option -g window-status-format "#[fg=#c6d0f5,bg=#51576d,none] ##I ##W##{?@pi_notify_label, ##{@pi_notify_label},} " \; set-window-option -g window-status-current-format "#[fg=#303446,bg=#8caaee,bold] ##I ##W##{?@pi_notify_label, ##{@pi_notify_label},} "'
 
 # Easier mobile-friendly window selector: prefix (Ctrl-a or Ctrl-b) then k.
 # Show only window names plus Pi notification status in the chooser.

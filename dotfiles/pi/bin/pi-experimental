@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+
+checkout="${PI_EXPERIMENTAL_ROOT:-$HOME/.pi/experimental/pi-main-04d6447}"
+cli="$checkout/packages/coding-agent/dist/cli.js"
+
+if [ ! -f "$cli" ]; then
+  echo "Experimental Pi is not built at $checkout. Run ~/agent-config/bootstrap.sh." >&2
+  exit 1
+fi
+
+node_bin="${PI_EXPERIMENTAL_NODE:-$(command -v node || true)}"
+if [ -z "$node_bin" ]; then
+  echo "Node.js is required to run experimental Pi." >&2
+  exit 1
+fi
+
+exec "$node_bin" "$cli" "$@"

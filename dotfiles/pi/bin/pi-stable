@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+if [ -n "${PI_STABLE_BIN:-}" ] && [ -x "$PI_STABLE_BIN" ]; then
+  exec "$PI_STABLE_BIN" "$@"
+fi
+
+for candidate in /opt/homebrew/bin/pi /usr/local/bin/pi "$HOME/.npm-global/bin/pi"; do
+  if [ -x "$candidate" ]; then
+    exec "$candidate" "$@"
+  fi
+done
+
+clean_path=""
+old_ifs=$IFS
+IFS=:
+for directory in $PATH; do
+  case "$directory" in
+    "$HOME/.pi/agent/bin"|"$HOME/.local/bin") continue ;;
+  esac
+  if [ -z "$clean_path" ]; then clean_path=$directory; else clean_path="$clean_path:$directory"; fi
+done
+IFS=$old_ifs
+
+candidate=$(PATH="$clean_path" command -v pi || true)
+if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+  exec "$candidate" "$@"
+fi
+
+echo "Stable Pi was not found. Run: npm install -g --ignore-scripts @earendil-works/pi-coding-agent" >&2
+exit 1

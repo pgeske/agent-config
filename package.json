@@ -5,10 +5,12 @@
   "description": "Shared agent configuration, reusable skills, and Pi extensions.",
   "type": "module",
   "scripts": {
+    "bootstrap": "./bootstrap.sh",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx tests/*.test.ts",
+    "test": "node --test --import tsx tests/*.test.ts && python3 -m unittest discover -s skills/autoreview/scripts -p 'test_*.py'",
     "sync": "node scripts/sync.mjs",
-    "sync:dry-run": "node scripts/sync.mjs --dry-run"
+    "sync:dry-run": "node scripts/sync.mjs --dry-run",
+    "install:experimental-pi": "node scripts/install-experimental-pi.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.75.5",

@@ -1,0 +1,14 @@
+{
+  "defaultThinkingLevel": "xhigh",
+  "hideThinkingBlock": true,
+  "theme": "dark",
+  "uiMode": "fullscreen",
+  "fullscreenScrollbar": "auto",
+  "treeFilterMode": "no-tools",
+  "outputPad": 1,
+  "editorPaddingX": 1,
+  "showHardwareCursor": false,
+  "packages": [
+    "npm:pi-web-access@0.13.0"
+  ]
+}

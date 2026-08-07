@@ -470,6 +470,8 @@ function createTransport(server: McpServerConfig, authProvider?: OAuthClientProv
       args: server.args,
       env: server.env,
       cwd: server.cwd,
+      // MCP servers may emit verbose operational logs that corrupt Pi's TUI.
+      stderr: "ignore",
     });
   }
 
@@ -651,19 +653,46 @@ function findConfiguredServer(config: McpBridgeConfig | null, name: string): Mcp
   return server;
 }
 
-export default async function mcpBridge(pi: ExtensionAPI) {
+export default function mcpBridge(pi: ExtensionAPI) {
   const connections: BridgeConnection[] = [];
   const statuses = new Map<string, ServerStatus>();
   const usedToolNames = new Set<string>();
-  const config = await loadConfig();
+  let closed = false;
+  let started = false;
 
-  for (const server of config?.servers ?? []) {
-    statuses.set(server.name, { server, connected: false, toolCount: 0 });
+  async function connectConfiguredServers(): Promise<void> {
+    if (started || closed) return;
+    started = true;
+
+    const config = await loadConfig();
+    for (const server of config?.servers ?? []) {
+      statuses.set(server.name, { server, connected: false, toolCount: 0 });
+    }
+    if (!config || config.servers.length === 0) return;
+
+    for (const server of config.servers) {
+      if (closed) return;
+      try {
+        const connection = await connectServer(server);
+        if (closed) {
+          await connection.transport.close().catch(() => undefined);
+          return;
+        }
+        connections.push(connection);
+        statuses.set(server.name, { server, connected: true, toolCount: connection.tools.length });
+        for (const tool of connection.tools) registerMcpTool(pi, connection, tool, usedToolNames);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        statuses.set(server.name, { server, connected: false, toolCount: 0, lastError: message });
+        console.warn(`mcp-bridge: failed to connect to ${server.name}:`, error);
+      }
+    }
   }
 
   pi.registerCommand("mcp-bridge-status", {
     description: "Show configured MCP bridge servers and tools",
     handler: async (_args, ctx) => {
+      if (!started) await connectConfiguredServers();
       if (statuses.size === 0) {
         ctx.ui.notify("MCP bridge: no configured servers", "warning");
         return;
@@ -722,22 +751,13 @@ export default async function mcpBridge(pi: ExtensionAPI) {
     },
   });
 
-  if (!config || config.servers.length === 0) return;
-
-  for (const server of config.servers) {
-    try {
-      const connection = await connectServer(server);
-      connections.push(connection);
-      statuses.set(server.name, { server, connected: true, toolCount: connection.tools.length });
-      for (const tool of connection.tools) registerMcpTool(pi, connection, tool, usedToolNames);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      statuses.set(server.name, { server, connected: false, toolCount: 0, lastError: message });
-      console.warn(`mcp-bridge: failed to connect to ${server.name}:`, error);
-    }
-  }
+  pi.on("session_start", () => {
+    // Keep reload/resume responsive. Tools register as each server connects.
+    void connectConfiguredServers();
+  });
 
   pi.on("session_shutdown", async () => {
+    closed = true;
     await Promise.allSettled(connections.map((connection) => connection.transport.close()));
   });
 }

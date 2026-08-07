@@ -1,0 +1,3 @@
+#!/bin/sh
+# Use the pinned experimental Pi build selected for fullscreen mode.
+exec "$HOME/.local/bin/pi-experimental" "$@"

@@ -1,5 +1,16 @@
 theme = Catppuccin Frappe
 font-family = "JetBrainsMono Nerd Font Mono"
 font-size = 20
+
+# Remove fixed edge padding and visually extend the last terminal cells through
+# any unavoidable partial-cell remainder at the window edges.
+window-padding-x = 0
+window-padding-y = 0
+window-padding-color = extend-always
+
 mouse-scroll-multiplier = discrete:1
+# Keep Shift+mouse reserved for Ghostty selection/link handling, even inside tmux/apps.
+mouse-shift-capture = never
+# Avoid translating prompt clicks into synthetic arrow-key movement.
+cursor-click-to-move = false
 

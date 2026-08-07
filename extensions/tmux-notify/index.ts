@@ -4,14 +4,11 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const scriptPath = path.join(__dirname, "tmux-pi-notify");
 
-type NotifyState = "running" | "done" | "failed" | "review" | "blocked";
+type NotifyState = "running" | "done";
 
 const labels: Record<NotifyState, string> = {
 	running: "🔄",
 	done: "✅",
-	failed: "❌",
-	review: "👀",
-	blocked: "⚠️",
 };
 
 function inTmux(): boolean {
@@ -34,39 +31,17 @@ function mark(state: NotifyState): Promise<void> {
 	return runTmuxNotify(["set", state, labels[state]]);
 }
 
-function eventLooksErrored(event: unknown): boolean {
-	const value = event as Record<string, any>;
-	const result = value?.result ?? value?.toolResult ?? value?.message?.result;
-	return Boolean(
-		value?.error ||
-		value?.isError ||
-		result?.isError ||
-		result?.error ||
-		result?.details?.error ||
-		value?.message?.isError,
-	);
-}
-
 export default function (pi: ExtensionAPI) {
-	let sawToolError = false;
-
 	pi.on("session_start", async () => {
 		await runTmuxNotify(["install"]);
 	});
 
 	pi.on("agent_start", async () => {
-		sawToolError = false;
 		await mark("running");
 	});
 
-	pi.on("tool_result", async (event) => {
-		if (eventLooksErrored(event)) {
-			sawToolError = true;
-		}
-	});
-
-	pi.on("agent_end", async (event) => {
-		await mark(sawToolError || eventLooksErrored(event) ? "failed" : "done");
+	pi.on("agent_end", async () => {
+		await mark("done");
 	});
 
 	pi.registerCommand("tmux-notify", {
@@ -86,16 +61,13 @@ export default function (pi: ExtensionAPI) {
 					return;
 				case "running":
 				case "done":
-				case "failed":
-				case "review":
-				case "blocked":
 					await mark(command);
 					ctx.ui.notify(`tmux notification set: ${command}`, "info");
 					return;
 				case "set": {
 					const state = rest[0] as NotifyState | undefined;
 					if (!state || !(state in labels)) {
-						ctx.ui.notify("Usage: /tmux-notify set <running|done|failed|review|blocked>", "error");
+						ctx.ui.notify("Usage: /tmux-notify set <running|done>", "error");
 						return;
 					}
 					await mark(state);
@@ -103,7 +75,7 @@ export default function (pi: ExtensionAPI) {
 					return;
 				}
 				default:
-					ctx.ui.notify("Usage: /tmux-notify [install|clear|running|done|failed|review|blocked]", "error");
+					ctx.ui.notify("Usage: /tmux-notify [install|clear|running|done]", "error");
 			}
 		},
 	});

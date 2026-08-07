@@ -14,11 +14,13 @@ vim.opt.rtp:prepend(lazypath)
 require("lazy").setup({
 	-- Telescope Setup
     { 'nvim-telescope/telescope-ui-select.nvim' },
-    { 'nvim-telescope/telescope-fzf-native.nvim', build = 'make', enabled = vim.fn.executable('make') == 1 },
-    { "nvim-telescope/telescope.nvim",   tag = "0.1.8",    dependencies = { "nvim-lua/plenary.nvim" } },
-    { "nvim-treesitter/nvim-treesitter", run = ":TSUpdate" },
-    { "nvim-treesitter/playground" },
+    { 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' },
+    { "nvim-telescope/telescope.nvim", dependencies = { "nvim-lua/plenary.nvim" } },
+    { "nvim-treesitter/nvim-treesitter", branch = "main", build = ":TSUpdate" },
+    -- nvim-treesitter/playground is deprecated and incompatible with current nvim-treesitter.
+    -- Use :InspectTree from Neovim instead if needed.
     { "tpope/vim-fugitive",              lazy = false },
+    { "sindrets/diffview.nvim",           dependencies = { "nvim-lua/plenary.nvim" } },
     { "tpope/vim-commentary" },
     -- LSP Installation
     { "williamboman/mason.nvim", lazy =  false},
@@ -52,7 +54,7 @@ require("lazy").setup({
     { "simrat39/rust-tools.nvim" },
     {
         "nvim-tree/nvim-tree.lua",
-        branch = vim.fn.has("nvim-0.10") == 1 and "master" or "compat-nvim-0.9",
+        version = "*",
         lazy = false,
         dependencies = {
             "nvim-tree/nvim-web-devicons",
@@ -166,8 +168,18 @@ require("lazy").setup({
         }
     },
     { "almo7aya/openingh.nvim" },
+    {
+        "pwntester/octo.nvim",
+        cmd = "Octo",
+        dependencies = {
+            "nvim-lua/plenary.nvim",
+            "nvim-telescope/telescope.nvim",
+            "nvim-tree/nvim-web-devicons",
+        },
+        opts = {},
+    },
     { "ellisonleao/gruvbox.nvim", priority = 1000 , config = true, opts = ...},
-    { "catppuccin/nvim", name = "catppuccin", priority = 1000 },
+    { "catppuccin/nvim", name = "catppuccin", priority = 1000, opts = { flavour = "frappe" } },
 })
 
 vim.cmd("colorscheme catppuccin-frappe")

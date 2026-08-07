@@ -2,20 +2,24 @@
 
 -- LSP Zero Setup
 local lsp_zero = require("lsp-zero")
-lsp_zero.on_attach(function(client, bufnr)
+local function lsp_on_attach(_, bufnr)
   -- see :help lsp-zero-keybindings
   lsp_zero.default_keymaps({buffer = bufnr})
+  vim.keymap.set("n", "<leader>gr", vim.lsp.buf.references, {buffer = bufnr, desc = "Go to references"})
   -- format the buffer
   vim.keymap.set({ "n", "x" }, "<C-l>", function()
 	  vim.lsp.buf.format({ async = false, timeout_ms = 10000 })
-  end, {})
+  end, {buffer = bufnr})
 
-end)
+end
+
+lsp_zero.on_attach(lsp_on_attach)
 
 
 -- Mason Setup (LSP Installation)
 require("mason").setup({})
 require("mason-lspconfig").setup({
+  ensure_installed = { "gopls" },
   handlers = {
     lsp_zero.default_setup,
   },
@@ -25,7 +29,8 @@ require("mason-lspconfig").setup({
 local rust_tools = require("rust-tools")
 rust_tools.setup({
   server = {
-    on_attach = function(_, bufnr)
+    on_attach = function(client, bufnr)
+      lsp_on_attach(client, bufnr)
       vim.keymap.set("n", "<leader>ca", rust_tools.hover_actions.hover_actions, {buffer = bufnr})
     end,
     settings = {
@@ -74,10 +79,6 @@ cmp.setup({
 		end,
 	},
 })
-
--- Go Setup --
-local lspconfig = require("lspconfig")
-lspconfig.gopls.setup({})
 
 -- Terraform Setup --
 require'lspconfig'.terraformls.setup{}
