@@ -1,74 +1,41 @@
 ---
 name: agent-config-workflow
-description: Use when creating or editing shared agent skills or the shared AGENTS.md in ~/projects/agent-config, or when syncing those managed files into local agent-specific targets.
+description: Use when creating or editing shared agent skills, extensions, dotfiles, or AGENTS.md in ~/agent-config, or when syncing those files into local agent-specific targets.
 ---
 
 # Agent Config Workflow
 
 ## Source of truth
 
-- Create and edit skills only in `~/projects/agent-config/skills/<skill-name>`.
-- Create and edit the shared instructions file only in `~/projects/agent-config/AGENTS.md`.
-- Commit config changes in `~/projects/agent-config`; do not commit generated installed copies from agent-specific folders.
-- Push the branch from `~/projects/agent-config` directly when you want the config shared, unless your human partner explicitly asks for a PR workflow.
-- Do not edit installed copies in agent-specific folders.
-- Keep the repo minimal: add only the files needed for shared agent config.
+- Edit shared configuration only in `~/agent-config`.
+- Do not edit installed copies in `~/.config/opencode/`, `~/.claude/`, `~/.codex/`, `~/.agents/`, `~/.pi/agent/`, or Claude Desktop's local skill bundles.
+- Keep secrets and machine-local credentials out of the repository.
 
 ## Create or update a skill
 
-1. Create or edit `~/projects/agent-config/skills/<skill-name>/SKILL.md`.
-2. Add any skill-local helpers under that skill directory if needed.
-3. Run `~/projects/agent-config/install.sh <skill-name>`.
+1. Edit or create `~/agent-config/skills/<skill-name>/SKILL.md`.
+2. Use a lowercase alphanumeric, hyphenated skill name and valid `name`/`description` frontmatter.
+3. Add helper files under the same skill directory when needed.
+4. Run `~/agent-config/bootstrap.sh` to refresh dependencies and managed links.
 
-## Update shared AGENTS.md
+## Create or update an extension
 
-1. Edit `~/projects/agent-config/AGENTS.md`.
-2. Run `~/projects/agent-config/install.sh`.
-3. Verify `~/.config/opencode/AGENTS.md` points at the repo source.
+1. Edit or create `~/agent-config/extensions/<extension-name>/index.ts`.
+2. Add runtime dependencies to `~/agent-config/package.json`.
+3. Add focused tests under `~/agent-config/tests/` when behavior changes.
+4. Run `npm run typecheck` and the relevant tests before shipping.
+5. Run `~/agent-config/bootstrap.sh` to install the updated extension.
+
+## Update shared instructions or dotfiles
+
+1. Edit `~/agent-config/AGENTS.md` or the source under `~/agent-config/dotfiles/`.
+2. Run `~/agent-config/bootstrap.sh`, or preview dotfile changes with `/config-sync --dry-run` first.
+3. Verify installed targets point to the repository source and contain no credentials.
 
 ## Commit and push
 
-1. Review the diff in `~/projects/agent-config`.
-2. Commit the config change in `~/projects/agent-config`.
-3. Push that branch directly from `~/projects/agent-config` unless your human partner asks for a different flow.
-4. Never commit installed copies from `~/.openclaw/workspace/skills`, `~/.opencode/skills`, `~/.config/opencode/skills`, `~/.codex/skills`, or `~/.config/opencode/AGENTS.md`.
-
-## Install
-
-Install everything:
-
-```bash
-~/projects/agent-config/install.sh
-```
-
-Install the shared AGENTS.md plus one or more skills:
-
-```bash
-~/projects/agent-config/install.sh my-skill another-skill
-```
-
-Replace mismatched managed targets:
-
-```bash
-~/projects/agent-config/install.sh --force
-```
-
-Optional cleanup of stale agent-config-managed skill links:
-
-```bash
-~/projects/agent-config/install.sh --prune
-```
-
-## Targets
-
-Configured in `~/projects/agent-config/targets.yaml`.
-Default skill targets:
-
-- `~/.openclaw/workspace/skills`
-- `~/.opencode/skills`
-- `~/.config/opencode/skills`
-- `~/.codex/skills`
-
-Managed shared config target:
-
-- `~/.config/opencode/AGENTS.md`
+1. Review the diff in `~/agent-config`.
+2. Run affected tests, then the final typecheck/test suite at the review-ready checkpoint.
+3. Commit the cohesive change with signing enabled.
+4. Push from `~/agent-config` when the change should be shared.
+5. Never commit generated installed copies from agent-specific config directories.

@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
@@ -97,12 +98,30 @@ function resolveUserPath(input, home) {
 }
 
 function managedItems(options) {
-  return [
+  const items = [
     {
       label: "Pi AGENTS.md",
       type: "file",
       source: path.join(repoRoot, "AGENTS.md"),
       target: path.join(options.piAgentDir, "AGENTS.md"),
+    },
+    {
+      label: "Pi settings overlay",
+      type: "json-merge",
+      source: path.join(repoRoot, "dotfiles", "pi", "settings.json"),
+      target: path.join(options.piAgentDir, "settings.json"),
+    },
+    {
+      label: "Pi keybindings",
+      type: "file",
+      source: path.join(repoRoot, "dotfiles", "pi", "keybindings.json"),
+      target: path.join(options.piAgentDir, "keybindings.json"),
+    },
+    {
+      label: "Pi web-search config",
+      type: "file",
+      source: path.join(repoRoot, "dotfiles", "pi", "web-search.json"),
+      target: path.join(options.home, ".pi", "web-search.json"),
     },
     {
       label: "tmux config",
@@ -130,6 +149,31 @@ function managedItems(options) {
       optional: true,
     },
   ];
+
+  if (process.platform !== "win32") {
+    items.push(
+      {
+        label: "Pi launcher",
+        type: "file",
+        source: path.join(repoRoot, "dotfiles", "pi", "bin", "pi"),
+        target: path.join(options.piAgentDir, "bin", "pi"),
+      },
+      {
+        label: "Stable Pi launcher",
+        type: "file",
+        source: path.join(repoRoot, "dotfiles", "pi", "bin", "pi-stable"),
+        target: path.join(options.piAgentDir, "bin", "pi-stable"),
+      },
+      {
+        label: "Experimental Pi launcher",
+        type: "file",
+        source: path.join(repoRoot, "dotfiles", "pi", "bin", "pi-experimental"),
+        target: path.join(options.home, ".local", "bin", "pi-experimental"),
+      },
+    );
+  }
+
+  return items;
 }
 
 async function pathExists(p) {
@@ -197,9 +241,40 @@ async function safeLstat(p) {
   }
 }
 
+async function readJson(target) {
+  try {
+    return JSON.parse(await fs.readFile(target, "utf8"));
+  } catch (error) {
+    throw new Error(`Unable to read JSON from ${target}: ${error.message}`);
+  }
+}
+
+function mergeJson(current, overlay) {
+  if (Array.isArray(current) && Array.isArray(overlay)) {
+    const merged = [...current];
+    for (const value of overlay) {
+      if (!merged.some((existing) => isDeepStrictEqual(existing, value))) merged.push(value);
+    }
+    return merged;
+  }
+  if (current && overlay && typeof current === "object" && typeof overlay === "object" && !Array.isArray(current) && !Array.isArray(overlay)) {
+    const merged = { ...current };
+    for (const [key, value] of Object.entries(overlay)) {
+      merged[key] = key in current ? mergeJson(current[key], value) : value;
+    }
+    return merged;
+  }
+  return overlay;
+}
+
 async function targetIsCurrent(item, mode) {
   const targetStat = await safeLstat(item.target);
   if (!targetStat) return false;
+
+  if (item.type === "json-merge") {
+    const [current, overlay] = await Promise.all([readJson(item.target), readJson(item.source)]);
+    return isDeepStrictEqual(current, mergeJson(current, overlay));
+  }
 
   if (mode === "symlink") {
     if (!targetStat.isSymbolicLink()) return false;
@@ -226,6 +301,9 @@ async function backupTarget(target) {
 
 async function replaceTarget(item, options) {
   const exists = await pathExists(item.target);
+  const mergedJson = item.type === "json-merge"
+    ? mergeJson(exists ? await readJson(item.target) : {}, await readJson(item.source))
+    : null;
   let backupPath = null;
 
   if (exists) {
@@ -237,7 +315,9 @@ async function replaceTarget(item, options) {
   }
 
   await fs.mkdir(path.dirname(item.target), { recursive: true });
-  if (options.mode === "copy") {
+  if (item.type === "json-merge") {
+    await fs.writeFile(item.target, `${JSON.stringify(mergedJson, null, 2)}\n`);
+  } else if (options.mode === "copy") {
     if (item.type === "dir") {
       await fs.cp(item.source, item.target, { recursive: true, force: true, errorOnExist: false });
     } else {
@@ -272,7 +352,8 @@ async function sync(options) {
     const exists = await pathExists(item.target);
     const action = exists ? "replace" : "create";
     if (options.dryRun) {
-      results.push({ item, action, detail: `${options.mode}${exists && options.backup ? ", backup first" : ""}` });
+      const method = item.type === "json-merge" ? "merge" : options.mode;
+      results.push({ item, action, detail: `${method}${exists && options.backup ? ", backup first" : ""}` });
       continue;
     }
 

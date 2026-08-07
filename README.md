@@ -1,63 +1,101 @@
 # Agent Config
 
-Personal Pi package plus machine setup dotfiles.
-
-## Goals
-
-- Install Pi once, then install this repo as a Pi package.
-- Keep Pi extensions, skills, prompts, themes, and global `AGENTS.md` in one place.
-- Sync editor/terminal dotfiles on a fresh machine or an existing machine with the same command.
-- Keep secrets and machine-local values out of git.
+Personal Pi, agent, tmux, terminal, and editor setup. The repository is designed to be cloned onto a new machine and safely re-applied as the setup evolves.
 
 ## Fresh machine
 
+Prerequisites: Git, Node.js, and npm. On macOS, Ghostty, tmux, and Neovim are optional but recommended.
+
 ```bash
-curl -fsSL https://pi.dev/install.sh | sh
-pi install git:git@github.com:pgeske/agent-config
+git clone https://github.com/pgeske/agent-config.git ~/agent-config
+cd ~/agent-config
+./bootstrap.sh
+```
+
+Ensure the managed launchers are early in your shell `PATH`:
+
+```bash
+export PATH="$HOME/.pi/agent/bin:$HOME/.local/bin:$PATH"
+```
+
+Then start Pi and configure a personal provider:
+
+```bash
 pi
-/config-sync --dry-run
-/config-sync
 ```
 
-You can also run the sync script directly from the package checkout:
-
-```bash
-node ~/.pi/agent/git/github.com/pgeske/agent-config/scripts/sync.mjs --dry-run
-node ~/.pi/agent/git/github.com/pgeske/agent-config/scripts/sync.mjs
-```
+Run `/login` inside Pi. Provider credentials, model catalogs, MCP credentials, and other machine-local secrets are intentionally not stored here.
 
 ## Updating later
 
 ```bash
-pi update --extensions
-pi
-/config-sync --dry-run
-/config-sync
+cd ~/agent-config
+git pull --ff-only
+./bootstrap.sh
 ```
 
-The sync command is idempotent. It backs up replaced files as `.bak-<timestamp>` unless `--no-backup` is passed.
+`bootstrap.sh` is idempotent. It:
 
-## What Pi loads from this package
+1. installs stable Pi with npm when it is missing;
+2. installs this repository's dependencies;
+3. builds the pinned experimental Pi used for fullscreen mode;
+4. links shared skills, extensions, and `AGENTS.md` into supported agents; and
+5. syncs Pi, tmux, Neovim, and Ghostty configuration.
 
-- `AGENTS.md` - personal global instructions, synced to `~/.pi/agent/AGENTS.md`
-- `extensions/` - Pi extensions and slash commands
-- `skills/` - reusable skills
-- `prompts/` - prompt templates, if present
-- `themes/` - Pi themes, if present
+Existing dotfiles are backed up as `.bak-<timestamp>` before replacement. Preview file changes without applying them with:
 
-## Dotfiles synced by `/config-sync`
+```bash
+npm run sync:dry-run
+# or inside Pi
+/config-sync --dry-run
+```
 
-- `dotfiles/tmux/tmux.conf` -> `~/.tmux.conf`
-- `dotfiles/tmux/tmux.conf.local` -> `~/.tmux.conf.local`
-- `dotfiles/nvim/` -> `~/.config/nvim/` on macOS/Linux, `%LOCALAPPDATA%\nvim\` on Windows
-- `dotfiles/ghostty/config` -> `~/.config/ghostty/config`
-- `AGENTS.md` -> `~/.pi/agent/AGENTS.md`
+## Pi experience
 
-By default, sync uses symlinks on macOS/Linux and copies on Windows. Override with `--mode symlink` or `--mode copy`.
+- `pi` launches the pinned experimental build with fullscreen mode enabled.
+- `pi-stable` bypasses it and launches the installed stable release.
+- `Ctrl+K` opens session resume; `Ctrl+N` starts a new session.
+- tmux uses Catppuccin Frappé styling with Pi activity/completion markers.
+- `/branch`, `/merge`, `/detach`, and `/branches` provide tmux-backed parallel session branches.
+- `/config-sync` reapplies the managed machine configuration.
+- MCP, Codex image generation, voice bridge, tmux notification, Excalidraw, Codex review, and background subagent extensions are included.
 
-## Testing safely
+The experimental Pi source is pinned to commit [`04d6447f7c492aafac97e2d2450b532650a85556`](https://github.com/earendil-works/pi/commit/04d6447f7c492aafac97e2d2450b532650a85556) and built under `~/.pi/experimental/pi-main-04d6447`.
 
-Run against a fake home instead of your real profile:
+## Managed configuration
+
+`/config-sync` or `npm run sync` manages:
+
+- `AGENTS.md` → `~/.pi/agent/AGENTS.md`
+- `dotfiles/pi/settings.json` → merged into `~/.pi/agent/settings.json`
+- `dotfiles/pi/keybindings.json` → `~/.pi/agent/keybindings.json`
+- `dotfiles/pi/web-search.json` → `~/.pi/web-search.json`
+- `dotfiles/pi/bin/` → Pi launchers under `~/.pi/agent/bin/` and `~/.local/bin/`
+- `dotfiles/tmux/tmux.conf` → `~/.tmux.conf`
+- `dotfiles/tmux/tmux.conf.local` → `~/.tmux.conf.local`
+- `dotfiles/nvim/` → `~/.config/nvim/` on macOS/Linux or `%LOCALAPPDATA%\nvim\` on Windows
+- `dotfiles/ghostty/config` → `~/.config/ghostty/config`
+
+Static files use symlinks on macOS/Linux and copies on Windows. The Pi settings overlay is merged so local provider/model choices and unrelated packages remain intact.
+
+## Machine-local configuration
+
+Keep these outside git:
+
+- `~/.pi/agent/auth.json`
+- `~/.pi/agent/mcp.json`
+- `~/.pi/agent/models.json`
+- API keys, OAuth tokens, webhook URLs, and private keys
+
+The MCP bridge reads `~/.pi/agent/mcp.json`; `.env.example` shows environment-variable placeholders. The voice bridge is inert until a compatible local broker is listening at `~/.pi/voice/control.sock`.
+
+## What was intentionally not mirrored
+
+This personal setup excludes employer-specific skills, internal MCP endpoints, internal model gateways, account-routing rules, Slack workflow hooks, deployment tooling, credentials, and organization-specific instructions. Generic workflow and coding preferences were translated into the personal `AGENTS.md`.
+
+## Safe testing
+
+Run config sync against a fake home:
 
 ```bash
 npm run sync:dry-run -- --home /tmp/agent-home --config-home /tmp/agent-home/.config --pi-agent-dir /tmp/agent-home/.pi/agent --mode copy
@@ -67,9 +105,9 @@ npm run sync -- --home /tmp/agent-home --config-home /tmp/agent-home/.config --p
 ## Development
 
 ```bash
-npm install
+npm ci --ignore-scripts
 npm run typecheck
 npm test
 ```
 
-MCP bridge secrets belong in environment variables or local untracked config such as `~/.pi/agent/mcp.json`; use `.env.example` as a template only.
+Pi extensions execute arbitrary code. Review third-party package changes before updating or installing them.

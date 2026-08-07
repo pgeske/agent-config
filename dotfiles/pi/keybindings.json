@@ -1,0 +1,6 @@
+{
+  "app.session.resume": "ctrl+k",
+  "app.session.new": "ctrl+n",
+  "tui.editor.deleteToLineEnd": [],
+  "app.session.toggleNamedFilter": []
+}
