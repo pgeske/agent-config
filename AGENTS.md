@@ -84,7 +84,6 @@ These are personal global rules applied to AI coding sessions across tools.
 
 ## Workflow Routing
 
-- Use `development-workflow` for non-trivial implementation work that should have a plan and tests.
 - Use `gather-context` before broad searches when the answer may depend on shell history, notes, or repositories outside the current workspace.
 - Use `agent-config-workflow` when editing shared agent configuration.
 - Use `design-doc-writing` when drafting or editing a design document or RFC.

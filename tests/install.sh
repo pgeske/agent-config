@@ -51,56 +51,6 @@ test_install_all_creates_opencode_agents_symlink() (
     "$ROOT_DIR/AGENTS.md"
 )
 
-test_named_skill_install_still_installs_agents() (
-  local home_dir
-  home_dir=$(mktemp -d)
-  trap 'rm -rf "$home_dir"' EXIT
-
-  run_install "$home_dir" testskill
-
-  assert_symlink_target \
-    "$home_dir/.config/opencode/AGENTS.md" \
-    "$ROOT_DIR/AGENTS.md"
-
-  assert_symlink_target \
-    "$home_dir/.config/opencode/skills/testskill" \
-    "$ROOT_DIR/skills/testskill"
-)
-
-test_named_development_workflow_stack_installs_skills() (
-  local home_dir
-
-  home_dir=$(mktemp -d)
-  trap 'rm -rf "$home_dir"' EXIT
-
-  run_install "$home_dir" \
-    development-workflow \
-    requirements-clarity \
-    git-worktree \
-    tdd-red-green-refactor \
-    final-code-review
-
-  assert_symlink_target \
-    "$home_dir/.config/opencode/skills/development-workflow" \
-    "$ROOT_DIR/skills/development-workflow"
-
-  assert_symlink_target \
-    "$home_dir/.config/opencode/skills/requirements-clarity" \
-    "$ROOT_DIR/skills/requirements-clarity"
-
-  assert_symlink_target \
-    "$home_dir/.config/opencode/skills/git-worktree" \
-    "$ROOT_DIR/skills/git-worktree"
-
-  assert_symlink_target \
-    "$home_dir/.config/opencode/skills/tdd-red-green-refactor" \
-    "$ROOT_DIR/skills/tdd-red-green-refactor"
-
-  assert_symlink_target \
-    "$home_dir/.config/opencode/skills/final-code-review" \
-    "$ROOT_DIR/skills/final-code-review"
-)
-
 test_named_gather_context_install_still_installs_agents() (
   local home_dir
 
@@ -326,8 +276,6 @@ test_force_replaces_stale_target_root_symlink() (
 
 main() {
   test_install_all_creates_opencode_agents_symlink
-  test_named_skill_install_still_installs_agents
-  test_named_development_workflow_stack_installs_skills
   test_named_gather_context_install_still_installs_agents
   test_install_all_installs_pi_extensions
   test_extension_conflict_requires_force

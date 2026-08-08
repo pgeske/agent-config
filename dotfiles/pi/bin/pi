@@ -1,3 +1,8 @@
 #!/bin/sh
+# Pi's terminal detection needs this hint to retain truecolor inside tmux.
+if [ -n "${TMUX:-}" ] && [ -z "${COLORTERM:-}" ]; then
+  export COLORTERM=truecolor
+fi
+
 # Use the pinned experimental Pi build selected for fullscreen mode.
 exec "$HOME/.local/bin/pi-experimental" "$@"

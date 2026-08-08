@@ -112,6 +112,12 @@ function managedItems(options) {
       target: path.join(options.piAgentDir, "settings.json"),
     },
     {
+      label: "Pi themes",
+      type: "dir",
+      source: path.join(repoRoot, "dotfiles", "pi", "themes"),
+      target: path.join(options.piAgentDir, "themes"),
+    },
+    {
       label: "Pi keybindings",
       type: "file",
       source: path.join(repoRoot, "dotfiles", "pi", "keybindings.json"),
@@ -249,10 +255,22 @@ async function readJson(target) {
   }
 }
 
-function mergeJson(current, overlay) {
+function mergeJson(current, overlay, parentKey = "") {
   if (Array.isArray(current) && Array.isArray(overlay)) {
     const merged = [...current];
     for (const value of overlay) {
+      if (parentKey === "packages" && value && typeof value === "object" && typeof value.source === "string") {
+        const existingIndexes = merged
+          .map((existing, index) => existing === value.source || existing?.source === value.source ? index : -1)
+          .filter((index) => index >= 0);
+        if (existingIndexes.length > 0) {
+          merged[existingIndexes[0]] = value;
+          for (let index = existingIndexes.length - 1; index > 0; index -= 1) {
+            merged.splice(existingIndexes[index], 1);
+          }
+          continue;
+        }
+      }
       if (!merged.some((existing) => isDeepStrictEqual(existing, value))) merged.push(value);
     }
     return merged;
@@ -260,7 +278,7 @@ function mergeJson(current, overlay) {
   if (current && overlay && typeof current === "object" && typeof overlay === "object" && !Array.isArray(current) && !Array.isArray(overlay)) {
     const merged = { ...current };
     for (const [key, value] of Object.entries(overlay)) {
-      merged[key] = key in current ? mergeJson(current[key], value) : value;
+      merged[key] = key in current ? mergeJson(current[key], value, key) : value;
     }
     return merged;
   }

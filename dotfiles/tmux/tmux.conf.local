@@ -460,6 +460,7 @@ tmux_conf_uninstall_plugins_on_reload=true
 # Fix Colors
 set -g default-terminal "screen-256color"
 set -as terminal-features ",xterm-256color:RGB"
+set-environment -g COLORTERM truecolor
 bind -n C-] resize-pane -Z
 
 # Pane picker on prefix/leader + p
@@ -549,7 +550,7 @@ set-window-option -g window-status-format '#[fg=#c6d0f5,bg=#51576d,none] #I #W#{
 set-window-option -g window-status-current-format '#[fg=#303446,bg=#8caaee,bold] #I #W#{?@pi_notify_label, #{@pi_notify_label},} '
 # Re-apply after startup because theme/plugin hooks can overwrite window status
 # formats after ~/.tmux.conf.local is first sourced.
-run -b 'sleep 1; tmux set-option -g status-style "fg=#c6d0f5,bg=#303446,none" \; set-option -g status-left "" \; set-option -g status-left-style "fg=#c6d0f5,bg=#303446,none" \; set-option -g status-right "" \; set-option -g window-style "fg=#c6d0f5,bg=#303446" \; set-option -g window-active-style "fg=#c6d0f5,bg=#303446" \; set-window-option -g pane-border-status off \; set-window-option -g pane-border-format "" \; set-window-option -g pane-border-style "fg=#51576d,bg=#303446" \; set-window-option -g pane-active-border-style "fg=#8caaee,bg=#303446" \; set-window-option -g window-status-separator "" \; set-window-option -g window-status-activity-style "fg=#c6d0f5,bg=#51576d,none" \; set-window-option -g window-status-last-style "fg=#c6d0f5,bg=#51576d,none" \; set-window-option -g window-status-bell-style "fg=#303446,bg=#e5c890,bold" \; set-window-option -g window-status-format "#[fg=#c6d0f5,bg=#51576d,none] ##I ##W##{?@pi_notify_label, ##{@pi_notify_label},} " \; set-window-option -g window-status-current-format "#[fg=#303446,bg=#8caaee,bold] ##I ##W##{?@pi_notify_label, ##{@pi_notify_label},} "'
+run -b 'sleep 6; tmux set-option -g status-style "fg=#c6d0f5,bg=#303446,none" \; set-option -g status-left "" \; set-option -g status-left-style "fg=#c6d0f5,bg=#303446,none" \; set-option -g status-right "" \; set-option -g window-style "fg=#c6d0f5,bg=#303446" \; set-option -g window-active-style "fg=#c6d0f5,bg=#303446" \; set-window-option -g pane-border-status off \; set-window-option -g pane-border-format "" \; set-window-option -g pane-border-style "fg=#51576d,bg=#303446" \; set-window-option -g pane-active-border-style "fg=#8caaee,bg=#303446" \; set-window-option -g window-status-separator "" \; set-window-option -g window-status-activity-style "fg=#c6d0f5,bg=#51576d,none" \; set-window-option -g window-status-last-style "fg=#c6d0f5,bg=#51576d,none" \; set-window-option -g window-status-bell-style "fg=#303446,bg=#e5c890,bold" \; set-window-option -g window-status-format "#[fg=#c6d0f5,bg=#51576d,none] ##I ##W##{?@pi_notify_label, ##{@pi_notify_label},} " \; set-window-option -g window-status-current-format "#[fg=#303446,bg=#8caaee,bold] ##I ##W##{?@pi_notify_label, ##{@pi_notify_label},} "'
 
 # Easier mobile-friendly window selector: prefix (Ctrl-a or Ctrl-b) then k.
 # Show only window names plus Pi notification status in the chooser.

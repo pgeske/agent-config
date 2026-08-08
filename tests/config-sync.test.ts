@@ -53,7 +53,7 @@ test("config sync copies managed dotfiles into a fake home", async () => {
     await writeFile(join(piAgentDir, "settings.json"), JSON.stringify({
       defaultProvider: "anthropic",
       defaultModel: "personal-model",
-      packages: ["npm:existing-package"],
+      packages: ["npm:existing-package", "npm:pi-web-access@0.13.0"],
     }));
     const args = ["--home", home, "--config-home", join(home, ".config"), "--pi-agent-dir", piAgentDir, "--mode", "copy"];
     const first = await runSync(args, env);
@@ -66,7 +66,12 @@ test("config sync copies managed dotfiles into a fake home", async () => {
     assert.equal(settings.defaultProvider, "anthropic");
     assert.equal(settings.defaultModel, "personal-model");
     assert.equal(settings.uiMode, "fullscreen");
-    assert.deepEqual(settings.packages, ["npm:existing-package", "npm:pi-web-access@0.13.0"]);
+    assert.equal(settings.theme, "catppuccin-frappe");
+    assert.deepEqual(settings.packages, [
+      "npm:existing-package",
+      { source: "npm:pi-web-access@0.13.0", skills: [] },
+    ]);
+    assert.equal(await readFile(join(piAgentDir, "themes", "catppuccin-frappe.json"), "utf8"), await readFile(join(repoRoot, "dotfiles", "pi", "themes", "catppuccin-frappe.json"), "utf8"));
     assert.equal(await readFile(join(piAgentDir, "keybindings.json"), "utf8"), await readFile(join(repoRoot, "dotfiles", "pi", "keybindings.json"), "utf8"));
     assert.equal(await readFile(join(home, ".pi", "web-search.json"), "utf8"), await readFile(join(repoRoot, "dotfiles", "pi", "web-search.json"), "utf8"));
     assert.equal(await readFile(join(home, ".tmux.conf.local"), "utf8"), await readFile(join(repoRoot, "dotfiles", "tmux", "tmux.conf.local"), "utf8"));

@@ -1,7 +1,7 @@
 {
   "defaultThinkingLevel": "xhigh",
   "hideThinkingBlock": true,
-  "theme": "dark",
+  "theme": "catppuccin-frappe",
   "uiMode": "fullscreen",
   "fullscreenScrollbar": "auto",
   "treeFilterMode": "no-tools",
@@ -9,6 +9,9 @@
   "editorPaddingX": 1,
   "showHardwareCursor": false,
   "packages": [
-    "npm:pi-web-access@0.13.0"
+    {
+      "source": "npm:pi-web-access@0.13.0",
+      "skills": []
+    }
   ]
 }
