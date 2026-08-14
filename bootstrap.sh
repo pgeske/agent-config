@@ -37,14 +37,19 @@ require_command git
 require_command node
 require_command npm
 
+required_stable_pi=$(node -e 'const p = require(process.argv[1]); console.log(p.dependencies["@earendil-works/pi-coding-agent"].replace(/^[^0-9]*/, ""))' "$ROOT_DIR/package.json")
 stable_pi=$(find_stable_pi)
-if [[ -z "$stable_pi" ]]; then
-  printf 'Installing stable Pi with npm...\n'
-  npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+stable_pi_version=""
+if [[ -n "$stable_pi" ]]; then
+  stable_pi_version=$($stable_pi --version 2>/dev/null || true)
+fi
+if [[ "$stable_pi_version" != "$required_stable_pi" ]]; then
+  printf 'Installing stable Pi %s with npm...\n' "$required_stable_pi"
+  npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@$required_stable_pi"
   stable_pi=$(find_stable_pi)
 fi
-if [[ -z "$stable_pi" ]]; then
-  printf 'Stable Pi was installed but is not on PATH. Add the npm global bin directory and rerun.\n' >&2
+if [[ -z "$stable_pi" ]] || [[ $($stable_pi --version 2>/dev/null || true) != "$required_stable_pi" ]]; then
+  printf 'Stable Pi %s was installed but is not on PATH. Add the npm global bin directory and rerun.\n' "$required_stable_pi" >&2
   exit 1
 fi
 

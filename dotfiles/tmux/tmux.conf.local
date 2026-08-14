@@ -71,7 +71,9 @@ tmux_conf_24b_colour=auto
 #   - tmux_conf_theme_mouse
 #   - tmux_conf_theme_root
 #   - tmux_conf_theme_synchronized
-tmux_conf_theme=enabled
+# The status line is defined explicitly below. Disable the asynchronous theme
+# pass so it cannot overwrite those final values after a configuration reload.
+tmux_conf_theme=disabled
 
 # default theme
 tmux_conf_theme_colour_1="#080808"    # dark gray
@@ -156,9 +158,9 @@ tmux_conf_theme_mode_bg="#8caaee"
 tmux_conf_theme_mode_attr="bold"
 
 # status line style
-tmux_conf_theme_status_fg="$tmux_conf_theme_colour_3"
-tmux_conf_theme_status_bg="$tmux_conf_theme_colour_1"
-tmux_conf_theme_status_attr="none"
+tmux_conf_theme_status_fg="#737994"
+tmux_conf_theme_status_bg="#292c3c"
+tmux_conf_theme_status_attr="none,underscore,us=#737994"
 
 # terminal title
 #   - built-in variables are:
@@ -182,10 +184,10 @@ tmux_conf_theme_terminal_title="#h ❐ #S ● #I #W"
 #     - #{hostname_full_ssh}
 #     - #{username}
 #     - #{username_ssh}
-tmux_conf_theme_window_status_fg="$tmux_conf_theme_colour_3"
-tmux_conf_theme_window_status_bg="$tmux_conf_theme_colour_1"
-tmux_conf_theme_window_status_attr="none"
-tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
+tmux_conf_theme_window_status_fg="#c6d0f5"
+tmux_conf_theme_window_status_bg="#51576d"
+tmux_conf_theme_window_status_attr="none,underscore,us=#737994"
+tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}#{?@pi_notify_label, #{@pi_notify_label},}"
 #tmux_conf_theme_window_status_format="#{circled_window_index} #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
 #tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,🔔,}#{?window_zoomed_flag,🔍,}"
 
@@ -199,30 +201,31 @@ tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_
 #     - #{hostname_full_ssh}
 #     - #{username}
 #     - #{username_ssh}
-tmux_conf_theme_window_status_current_fg="$tmux_conf_theme_colour_1"
-tmux_conf_theme_window_status_current_bg="$tmux_conf_theme_colour_4"
-tmux_conf_theme_window_status_current_attr="bold"
-tmux_conf_theme_window_status_current_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
+tmux_conf_theme_window_status_current_fg="#303446"
+tmux_conf_theme_window_status_current_bg="#8caaee"
+tmux_conf_theme_window_status_current_attr="bold,underscore,us=#737994"
+tmux_conf_theme_window_status_current_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}#{?@pi_notify_label, #{@pi_notify_label},}"
 #tmux_conf_theme_window_status_current_format="#{circled_window_index} #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
 #tmux_conf_theme_window_status_current_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,🔔,}#{?window_zoomed_flag,🔍,}"
 
-# window activity status style
-tmux_conf_theme_window_status_activity_fg="default"
-tmux_conf_theme_window_status_activity_bg="default"
-tmux_conf_theme_window_status_activity_attr="underscore"
+# Keep inactive tabs visually stable when they become last-used or report activity.
+tmux_conf_theme_window_status_activity_fg="#c6d0f5"
+tmux_conf_theme_window_status_activity_bg="#51576d"
+tmux_conf_theme_window_status_activity_attr="default"
 
 # window bell status style
-tmux_conf_theme_window_status_bell_fg="$tmux_conf_theme_colour_5"
-tmux_conf_theme_window_status_bell_bg="default"
-tmux_conf_theme_window_status_bell_attr="blink,bold"
+tmux_conf_theme_window_status_bell_fg="#303446"
+tmux_conf_theme_window_status_bell_bg="#e5c890"
+tmux_conf_theme_window_status_bell_attr="default"
 
-# window last status style
-tmux_conf_theme_window_status_last_fg="$tmux_conf_theme_colour_4"
-tmux_conf_theme_window_status_last_bg="$tmux_conf_theme_colour_2"
-tmux_conf_theme_window_status_last_attr="none"
+# The last-used tab should look like every other inactive tab.
+tmux_conf_theme_window_status_last_fg="#c6d0f5"
+tmux_conf_theme_window_status_last_bg="#51576d"
+tmux_conf_theme_window_status_last_attr="default"
 
 # status left/right sections separators
-tmux_conf_theme_left_separator_main=""
+# A zero-width style reset keeps adjacent tabs flush while satisfying the theme's separator logic.
+tmux_conf_theme_left_separator_main="#[none]"
 tmux_conf_theme_left_separator_sub="|"
 tmux_conf_theme_right_separator_main=""
 tmux_conf_theme_right_separator_sub="|"
@@ -382,8 +385,8 @@ tmux_conf_copy_to_os_clipboard=false
 # if you don't want Oh my tmux! to alter a binding, use #!important
 # bind c new-window -c '#{pane_current_path}' #!important
 
-# move status line to top
-#set -g status-position top
+# Keep window tabs at the top so terminal-cell remainder does not sit below them.
+set -g status-position top
 
 
 # -- tpm -----------------------------------------------------------------------
@@ -460,7 +463,6 @@ tmux_conf_uninstall_plugins_on_reload=true
 # Fix Colors
 set -g default-terminal "screen-256color"
 set -as terminal-features ",xterm-256color:RGB"
-set-environment -g COLORTERM truecolor
 bind -n C-] resize-pane -Z
 
 # Pane picker on prefix/leader + p
@@ -530,27 +532,38 @@ bind -n WheelDownPane if-shell -Ft= "#{mouse_any_flag}" "send-keys -M" "send-key
 # run '~/.tmux/plugins/tpm/tpm'
 
 # Keep the tmux chrome consistent with Pi's Catppuccin Frappé palette.
+# Use a darker mantle ribbon and subtle surface border so the top status row
+# reads as intentional chrome even where there are no window tabs.
 # These explicit overrides must stay after the theme template and notification
 # hooks so newly created windows use the same styling as existing ones.
+set-option -g message-style 'fg=#080808,bg=#ffff00,bold'
+set-option -g message-command-style 'fg=#ffff00,bg=#080808,bold'
+set-window-option -g mode-style 'fg=#303446,bg=#8caaee,bold'
+set-option -g display-panes-colour 'colour238'
+set-option -g display-panes-active-colour 'colour61'
+set-window-option -g clock-mode-colour '#00afff'
+set-window-option -g clock-mode-style 24
+set-option -g set-titles-string '#h ❐ #S ● #I #W'
 set-window-option -g pane-border-status off
 set-window-option -g pane-border-format ''
 set-window-option -g pane-border-style 'fg=#51576d,bg=#303446'
 set-window-option -g pane-active-border-style 'fg=#8caaee,bg=#303446'
 set-option -g window-style 'fg=#c6d0f5,bg=#303446'
 set-option -g window-active-style 'fg=#c6d0f5,bg=#303446'
-set-option -g status-style 'fg=#c6d0f5,bg=#303446,none'
+set-option -g status-style 'fg=#c6d0f5,bg=#292c3c,none,underscore,us=#737994'
 set-option -g status-left ''
-set-option -g status-left-style 'fg=#c6d0f5,bg=#303446,none'
+set-option -g status-left-length 0
+set-option -g status-left-style 'fg=#c6d0f5,bg=#292c3c,none,underscore,us=#737994'
 set-option -g status-right ''
+set-option -g status-right-style 'fg=#c6d0f5,bg=#292c3c,none,underscore,us=#737994'
 set-window-option -g window-status-separator ''
-set-window-option -g window-status-activity-style 'fg=#c6d0f5,bg=#51576d,none'
-set-window-option -g window-status-last-style 'fg=#c6d0f5,bg=#51576d,none'
-set-window-option -g window-status-bell-style 'fg=#303446,bg=#e5c890,bold'
-set-window-option -g window-status-format '#[fg=#c6d0f5,bg=#51576d,none] #I #W#{?@pi_notify_label, #{@pi_notify_label},} '
-set-window-option -g window-status-current-format '#[fg=#303446,bg=#8caaee,bold] #I #W#{?@pi_notify_label, #{@pi_notify_label},} '
-# Re-apply after startup because theme/plugin hooks can overwrite window status
-# formats after ~/.tmux.conf.local is first sourced.
-run -b 'sleep 6; tmux set-option -g status-style "fg=#c6d0f5,bg=#303446,none" \; set-option -g status-left "" \; set-option -g status-left-style "fg=#c6d0f5,bg=#303446,none" \; set-option -g status-right "" \; set-option -g window-style "fg=#c6d0f5,bg=#303446" \; set-option -g window-active-style "fg=#c6d0f5,bg=#303446" \; set-window-option -g pane-border-status off \; set-window-option -g pane-border-format "" \; set-window-option -g pane-border-style "fg=#51576d,bg=#303446" \; set-window-option -g pane-active-border-style "fg=#8caaee,bg=#303446" \; set-window-option -g window-status-separator "" \; set-window-option -g window-status-activity-style "fg=#c6d0f5,bg=#51576d,none" \; set-window-option -g window-status-last-style "fg=#c6d0f5,bg=#51576d,none" \; set-window-option -g window-status-bell-style "fg=#303446,bg=#e5c890,bold" \; set-window-option -g window-status-format "#[fg=#c6d0f5,bg=#51576d,none] ##I ##W##{?@pi_notify_label, ##{@pi_notify_label},} " \; set-window-option -g window-status-current-format "#[fg=#303446,bg=#8caaee,bold] ##I ##W##{?@pi_notify_label, ##{@pi_notify_label},} "'
+set-window-option -g window-status-style 'fg=#c6d0f5,bg=#51576d,none,underscore,us=#737994'
+set-window-option -g window-status-current-style 'fg=#303446,bg=#8caaee,bold,underscore,us=#737994'
+set-window-option -g window-status-activity-style 'fg=#c6d0f5,bg=#51576d,none,underscore,us=#737994'
+set-window-option -g window-status-last-style 'fg=#c6d0f5,bg=#51576d,none,underscore,us=#737994'
+set-window-option -g window-status-bell-style 'fg=#303446,bg=#e5c890,bold,underscore,us=#737994'
+set-window-option -g window-status-format ' #I #W#{?@pi_notify_label, #{@pi_notify_label},}#[fg=#737994]▕'
+set-window-option -g window-status-current-format ' #I #W#{?@pi_notify_label, #{@pi_notify_label},}#[fg=#737994]▕'
 
 # Easier mobile-friendly window selector: prefix (Ctrl-a or Ctrl-b) then k.
 # Show only window names plus Pi notification status in the chooser.

@@ -121,6 +121,9 @@ async function summarizeBranch(
 	if (!auth.ok) throw new Error(auth.error);
 	if (!auth.apiKey) throw new Error(`No API key is available for ${ctx.model.provider}/${ctx.model.id}`);
 	const apiKey = auth.apiKey;
+	const headers = Object.fromEntries(
+		Object.entries(auth.headers ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+	);
 
 	const controller = new AbortController();
 	const result = await ctx.ui.custom<BranchSummaryResult | undefined>((tui, theme, _keybindings, done) => {
@@ -138,7 +141,7 @@ async function summarizeBranch(
 		void generateBranchSummary(entries, {
 			model: ctx.model!,
 			apiKey,
-			headers: auth.headers,
+			headers,
 			signal: controller.signal,
 			customInstructions: MERGE_SUMMARY_INSTRUCTIONS,
 			replaceInstructions: true,
