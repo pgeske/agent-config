@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cluster_repo="$HOME/repositories/alycluster"
+script="$cluster_repo/scripts/deploy-filmstream"
+if [[ ! -x "$script" ]]; then
+  echo "Filmstream deploy script not found: $script" >&2
+  exit 1
+fi
+
+if [[ -z ${FILMSTREAM_REPO:-} ]]; then
+  export FILMSTREAM_REPO="$HOME/repositories/filmstream"
+fi
+
+exec "$script" "$@"

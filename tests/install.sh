@@ -49,6 +49,10 @@ test_install_all_creates_opencode_agents_symlink() (
   assert_symlink_target \
     "$home_dir/.pi/agent/AGENTS.md" \
     "$ROOT_DIR/AGENTS.md"
+
+  assert_symlink_target \
+    "$home_dir/.pi/agent/skills/peekaboo" \
+    "$ROOT_DIR/skills/peekaboo"
 )
 
 test_named_gather_context_install_still_installs_agents() (
@@ -81,10 +85,6 @@ test_install_all_installs_pi_extensions() (
     "$ROOT_DIR/extensions/subagents"
 
   assert_symlink_target \
-    "$home_dir/.pi/agent/extensions/mcp-bridge" \
-    "$ROOT_DIR/extensions/mcp-bridge"
-
-  assert_symlink_target \
     "$home_dir/.pi/agent/extensions/excalidraw.ts" \
     "$ROOT_DIR/extensions/excalidraw.ts"
 
@@ -96,9 +96,6 @@ test_install_all_installs_pi_extensions() (
     assert_symlink_target \
       "$home_dir/.pi/agent/extensions/node_modules" \
       "$ROOT_DIR/node_modules"
-
-    node -e "require.resolve('@modelcontextprotocol/sdk/client/index.js', { paths: [process.argv[1]] })" \
-      "$home_dir/.pi/agent/extensions/mcp-bridge"
   fi
 )
 

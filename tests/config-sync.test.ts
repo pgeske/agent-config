@@ -75,6 +75,9 @@ test("config sync copies managed dotfiles into a fake home", async () => {
     assert.equal(await readFile(join(piAgentDir, "themes", "catppuccin-frappe.json"), "utf8"), await readFile(join(repoRoot, "dotfiles", "pi", "themes", "catppuccin-frappe.json"), "utf8"));
     assert.equal(await readFile(join(piAgentDir, "keybindings.json"), "utf8"), await readFile(join(repoRoot, "dotfiles", "pi", "keybindings.json"), "utf8"));
     assert.equal(await readFile(join(home, ".pi", "web-search.json"), "utf8"), await readFile(join(repoRoot, "dotfiles", "pi", "web-search.json"), "utf8"));
+    if (process.platform === "darwin") {
+      assert.equal(await readFile(join(home, ".config", "mcp", "mcp.json"), "utf8"), await readFile(join(repoRoot, "dotfiles", "mcp", "mcp.json"), "utf8"));
+    }
     assert.equal(await readFile(join(home, ".tmux.conf.local"), "utf8"), await readFile(join(repoRoot, "dotfiles", "tmux", "tmux.conf.local"), "utf8"));
     const nvimTarget = process.platform === "win32"
       ? join(home, "AppData", "Local", "nvim")
@@ -107,6 +110,10 @@ test("config sync symlinks managed dotfiles on non-Windows platforms", { skip: p
     assert.equal(nvim.isSymbolicLink(), true);
     assert.equal(settings.isFile(), true);
     assert.equal(launcher.isSymbolicLink(), true);
+    if (process.platform === "darwin") {
+      const mcpConfig = await lstat(join(home, ".config", "mcp", "mcp.json"));
+      assert.equal(mcpConfig.isSymbolicLink(), true);
+    }
   } finally {
     await rm(home, { recursive: true, force: true });
   }

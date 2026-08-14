@@ -1,0 +1,22 @@
+# Homebrew
+if [[ -x /opt/homebrew/bin/brew ]]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
+# Oh My Zsh
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="robbyrussell"
+plugins=(git)
+source "$ZSH/oh-my-zsh.sh"
+
+# CLI integrations
+source <(fzf --zsh)
+eval "$(zoxide init zsh)"
+export EDITOR="nvim"
+export VISUAL="$EDITOR"
+
+# Pi and other user-local launchers
+export PATH="$HOME/.pi/agent/bin:$HOME/.local/bin:$PATH"
+
+# Personal services
+export FILMSTREAM_SERVER="http://filmstream.home.alyoshukai.com"

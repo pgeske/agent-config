@@ -87,4 +87,5 @@ These are personal global rules applied to AI coding sessions across tools.
 - Use `gather-context` before broad searches when the answer may depend on shell history, notes, or repositories outside the current workspace.
 - Use `agent-config-workflow` when editing shared agent configuration.
 - Use `design-doc-writing` when drafting or editing a design document or RFC.
+- Use `peekaboo` for native macOS GUI inspection and automation; use `agent-browser` for browser-only work.
 - Personal repositories normally live under `~/repositories`; shared agent configuration lives under `~/agent-config`.

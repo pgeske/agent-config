@@ -37,6 +37,13 @@ require_command git
 require_command node
 require_command npm
 
+if [[ $(uname -s) == Darwin ]] && ! command -v peekaboo >/dev/null 2>&1; then
+  require_command brew
+  printf 'Installing Peekaboo macOS automation...\n'
+  brew tap steipete/tap
+  brew install steipete/tap/peekaboo
+fi
+
 required_stable_pi=$(node -e 'const p = require(process.argv[1]); console.log(p.dependencies["@earendil-works/pi-coding-agent"].replace(/^[^0-9]*/, ""))' "$ROOT_DIR/package.json")
 stable_pi=$(find_stable_pi)
 stable_pi_version=""

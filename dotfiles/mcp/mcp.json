@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "peekaboo": {
+      "command": "peekaboo",
+      "args": ["mcp", "--no-remote"],
+      "lifecycle": "lazy-keep-alive",
+      "requestTimeoutMs": 120000
+    }
+  }
+}

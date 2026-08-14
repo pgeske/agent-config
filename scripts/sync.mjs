@@ -156,8 +156,29 @@ function managedItems(options) {
     },
   ];
 
+  if (process.platform === "darwin") {
+    items.push({
+      label: "Shared MCP config",
+      type: "file",
+      source: path.join(repoRoot, "dotfiles", "mcp", "mcp.json"),
+      target: path.join(options.configHome, "mcp", "mcp.json"),
+    });
+  }
+
   if (process.platform !== "win32") {
     items.push(
+      {
+        label: "Zsh config",
+        type: "file",
+        source: path.join(repoRoot, "dotfiles", "zsh", "zshrc"),
+        target: path.join(options.home, ".zshrc"),
+      },
+      {
+        label: "Filmstream deploy launcher",
+        type: "file",
+        source: path.join(repoRoot, "dotfiles", "bin", "deploy-filmstream"),
+        target: path.join(options.home, ".local", "bin", "deploy-filmstream"),
+      },
       {
         label: "Pi launcher",
         type: "file",
