@@ -1,4 +1,7 @@
 {
+  "settings": {
+    "mcpFooterStatus": "off"
+  },
   "mcpServers": {
     "peekaboo": {
       "command": "peekaboo",

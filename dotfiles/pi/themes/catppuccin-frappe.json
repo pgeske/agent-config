@@ -24,9 +24,7 @@
     "surface0": "#414559",
     "base": "#303446",
     "mantle": "#292c3c",
-    "crust": "#232634",
-    "toolSuccessBg": "#34443d",
-    "toolErrorBg": "#46383d"
+    "crust": "#232634"
   },
   "colors": {
     "accent": "mauve",
@@ -48,8 +46,8 @@
     "customMessageText": "text",
     "customMessageLabel": "mauve",
     "toolPendingBg": "mantle",
-    "toolSuccessBg": "toolSuccessBg",
-    "toolErrorBg": "toolErrorBg",
+    "toolSuccessBg": "mantle",
+    "toolErrorBg": "mantle",
     "toolTitle": "blue",
     "toolOutput": "subtext0",
     "mdHeading": "mauve",
