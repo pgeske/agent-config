@@ -2,7 +2,7 @@
   "defaultThinkingLevel": "xhigh",
   "hideThinkingBlock": true,
   "theme": "catppuccin-frappe",
-  "uiMode": "fullscreen",
+  "tuiMode": "fullscreen",
   "fullscreenScrollbar": "auto",
   "treeFilterMode": "no-tools",
   "outputPad": 1,
@@ -12,6 +12,7 @@
     {
       "source": "npm:pi-web-access@0.13.0",
       "skills": []
-    }
+    },
+    "npm:pi-mcp-adapter@2.21.2"
   ]
 }

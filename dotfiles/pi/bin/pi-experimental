@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-checkout="${PI_EXPERIMENTAL_ROOT:-$HOME/.pi/experimental/pi-main-04d6447}"
+checkout="${PI_EXPERIMENTAL_ROOT:-$HOME/.pi/experimental/pi-main-28657a2}"
 cli="$checkout/packages/coding-agent/dist/cli.js"
 
 if [ ! -f "$cli" ]; then

@@ -489,11 +489,6 @@ def run_codex(args: argparse.Namespace, repo: Path, prompt: str) -> str:
     schema_path = write_json_temp(SCHEMA)
     output_path = Path(tempfile.NamedTemporaryFile("w", suffix=".json", delete=False).name)
     cmd = [resolve_command(args.codex_bin, repo)]
-    if not args.codex_user_config:
-        # Review only needs Codex's built-in read-only tools. Loading the user's
-        # full config also starts unrelated MCPs and plugins, which can fail
-        # authentication before review begins.
-        cmd.append("--ignore-user-config")
     cmd.extend(["--ask-for-approval", "never"])
     if args.web_search:
         cmd.append("--search")
@@ -502,6 +497,9 @@ def run_codex(args: argparse.Namespace, repo: Path, prompt: str) -> str:
     if args.thinking:
         cmd.extend(["-c", f'model_reasoning_effort="{args.thinking}"'])
     cmd.append("exec")
+    if not args.codex_user_config:
+        # --ignore-user-config is an exec subcommand flag, not a top-level flag.
+        cmd.append("--ignore-user-config")
     if args.stream_engine_output:
         cmd.append("--json")
     cmd.extend(

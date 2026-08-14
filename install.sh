@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 SKILLS_DIR="$ROOT_DIR/skills"
 EXTENSIONS_DIR="$ROOT_DIR/extensions"
+COMMANDS_DIR="$ROOT_DIR/commands"
 TARGETS_FILE="$ROOT_DIR/targets.yaml"
 AGENTS_SOURCE="$ROOT_DIR/AGENTS.md"
 
@@ -412,6 +413,28 @@ if [[ -d "$EXTENSIONS_DIR" && ${#extension_targets[@]} -gt 0 ]]; then
 
       ln -s "$src" "$dst"
       printf '  linked %s -> %s\n' "$dst" "$src"
+    done
+  done
+fi
+
+if [[ -d "$COMMANDS_DIR" ]]; then
+  shopt -s nullglob
+  command_files=("$COMMANDS_DIR"/*.md)
+  shopt -u nullglob
+
+  if [[ ${#command_files[@]} -gt 0 ]]; then
+    printf '\nInstalling %s command(s)\n' "${#command_files[@]}"
+  fi
+
+  for command_file in "${command_files[@]}"; do
+    command_name=$(basename "$command_file")
+    for command_target in \
+      "$HOME/.config/opencode/commands/$command_name" \
+      "$HOME/.claude/commands/$command_name" \
+      "$HOME/.pi/agent/prompts/$command_name"; do
+      if ! install_managed_symlink "$command_file" "$command_target"; then
+        exit 1
+      fi
     done
   done
 fi

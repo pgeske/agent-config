@@ -36,7 +36,7 @@ git pull --ff-only
 
 `bootstrap.sh` is idempotent. It:
 
-1. installs stable Pi with npm when it is missing;
+1. installs the stable Pi version pinned by this repository;
 2. installs this repository's dependencies;
 3. builds the pinned experimental Pi used for fullscreen mode;
 4. links shared skills, extensions, and `AGENTS.md` into supported agents; and
@@ -55,12 +55,13 @@ npm run sync:dry-run
 - `pi` launches the pinned experimental build with fullscreen mode enabled.
 - `pi-stable` bypasses it and launches the installed stable release.
 - `Ctrl+K` opens session resume; `Ctrl+N` starts a new session.
-- tmux uses Catppuccin Frappé styling with Pi activity/completion markers.
+- Pi, tmux, Ghostty, and Neovim use coordinated Catppuccin Frappé styling.
 - `/branch`, `/merge`, `/detach`, and `/branches` provide tmux-backed parallel session branches.
+- `/handoff` writes a self-contained session handoff into the notes vault.
 - `/config-sync` reapplies the managed machine configuration.
-- MCP, Codex image generation, voice bridge, tmux notification, Excalidraw, Codex review, and background subagent extensions are included.
+- MCP adapter, fast compaction, autocomplete layout, Codex image generation, voice bridge, tmux notification, Excalidraw, Codex review, and background subagent extensions are included.
 
-The experimental Pi source is pinned to commit [`04d6447f7c492aafac97e2d2450b532650a85556`](https://github.com/earendil-works/pi/commit/04d6447f7c492aafac97e2d2450b532650a85556) and built under `~/.pi/experimental/pi-main-04d6447`.
+Stable Pi is pinned to `0.84.1`. The experimental Pi source is pinned to commit [`28657a2ffa6dbeccba74c166682e7a7ee547f5b4`](https://github.com/badlogic/pi-mono/commit/28657a2ffa6dbeccba74c166682e7a7ee547f5b4) and built under `~/.pi/experimental/pi-main-28657a2`.
 
 ## Managed configuration
 
@@ -68,6 +69,7 @@ The experimental Pi source is pinned to commit [`04d6447f7c492aafac97e2d2450b532
 
 - `AGENTS.md` → `~/.pi/agent/AGENTS.md`
 - `dotfiles/pi/settings.json` → merged into `~/.pi/agent/settings.json`
+- `dotfiles/pi/themes/` → `~/.pi/agent/themes/`
 - `dotfiles/pi/keybindings.json` → `~/.pi/agent/keybindings.json`
 - `dotfiles/pi/web-search.json` → `~/.pi/web-search.json`
 - `dotfiles/pi/bin/` → Pi launchers under `~/.pi/agent/bin/` and `~/.local/bin/`
@@ -87,7 +89,7 @@ Keep these outside git:
 - `~/.pi/agent/models.json`
 - API keys, OAuth tokens, webhook URLs, and private keys
 
-The MCP bridge reads `~/.pi/agent/mcp.json`; `.env.example` shows environment-variable placeholders. The voice bridge is inert until a compatible local broker is listening at `~/.pi/voice/control.sock`.
+The MCP adapter reads machine-local server definitions and credentials from `~/.pi/agent/mcp.json` and the system credential store. `.env.example` shows environment-variable placeholders for optional personal integrations. The voice bridge is inert until a compatible local broker is listening at `~/.pi/voice/control.sock`.
 
 ## What was intentionally not mirrored
 

@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-const defaultCommit = "04d6447f7c492aafac97e2d2450b532650a85556";
+const defaultCommit = "28657a2ffa6dbeccba74c166682e7a7ee547f5b4";
 const defaultRepository = "https://github.com/badlogic/pi-mono.git";
 
 function usage() {

@@ -13,10 +13,9 @@
     "install:experimental-pi": "node scripts/install-experimental-pi.mjs"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "^0.75.5",
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "typebox": "^1.1.38",
-    "@earendil-works/pi-coding-agent": "^0.75.5"
+    "@earendil-works/pi-ai": "^0.84.1",
+    "@earendil-works/pi-coding-agent": "^0.84.1",
+    "typebox": "^1.1.38"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

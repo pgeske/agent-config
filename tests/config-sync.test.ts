@@ -65,11 +65,12 @@ test("config sync copies managed dotfiles into a fake home", async () => {
     const settings = JSON.parse(await readFile(join(piAgentDir, "settings.json"), "utf8"));
     assert.equal(settings.defaultProvider, "anthropic");
     assert.equal(settings.defaultModel, "personal-model");
-    assert.equal(settings.uiMode, "fullscreen");
+    assert.equal(settings.tuiMode, "fullscreen");
     assert.equal(settings.theme, "catppuccin-frappe");
     assert.deepEqual(settings.packages, [
       "npm:existing-package",
       { source: "npm:pi-web-access@0.13.0", skills: [] },
+      "npm:pi-mcp-adapter@2.21.2",
     ]);
     assert.equal(await readFile(join(piAgentDir, "themes", "catppuccin-frappe.json"), "utf8"), await readFile(join(repoRoot, "dotfiles", "pi", "themes", "catppuccin-frappe.json"), "utf8"));
     assert.equal(await readFile(join(piAgentDir, "keybindings.json"), "utf8"), await readFile(join(repoRoot, "dotfiles", "pi", "keybindings.json"), "utf8"));

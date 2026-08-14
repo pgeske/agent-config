@@ -1,6 +1,9 @@
 theme = Catppuccin Frappe
 font-family = "JetBrainsMono Nerd Font Mono"
 font-size = 20
+# Make tmux's status underline read as a crisp bottom border.
+adjust-underline-position = 1
+adjust-underline-thickness = 1
 
 # Remove fixed edge padding and visually extend the last terminal cells through
 # any unavoidable partial-cell remainder at the window edges.
@@ -8,9 +11,16 @@ window-padding-x = 0
 window-padding-y = 0
 window-padding-color = extend-always
 
+# Use Chrome-style shortcuts to switch tmux windows instead of Ghostty tabs.
+# These send tmux's prefix followed by its previous/next-window bindings.
+keybind = super+shift+[=text:\x02\x08
+keybind = super+shift+]=text:\x02\x0c
+
 mouse-scroll-multiplier = discrete:1
 # Keep Shift+mouse reserved for Ghostty selection/link handling, even inside tmux/apps.
 mouse-shift-capture = never
 # Avoid translating prompt clicks into synthetic arrow-key movement.
 cursor-click-to-move = false
+# Scrolling still works normally; hide the reserved gutter at the right edge.
+scrollbar = never
 
