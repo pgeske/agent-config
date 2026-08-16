@@ -62,7 +62,3 @@ Optional focused prompt:
 - If a review finding causes a code change, rerun relevant tests and rerun `/codex-review`.
 - Do not push, merge, or mutate GitHub state just to review.
 - Report the command used, accepted findings, rejected findings, tests run, and final recommendation.
-
-## Subagent Use
-
-The `code-reviewer` subagent is the preferred reviewer for PRs or large/risky changes. It may use `/codex-review` when available and should fall back to `codex exec review` only if the extension command is unavailable.

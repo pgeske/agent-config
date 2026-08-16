@@ -81,8 +81,8 @@ test_install_all_installs_pi_extensions() (
   run_install "$home_dir"
 
   assert_symlink_target \
-    "$home_dir/.pi/agent/extensions/subagents" \
-    "$ROOT_DIR/extensions/subagents"
+    "$home_dir/.pi/agent/extensions/fast-compaction" \
+    "$ROOT_DIR/extensions/fast-compaction"
 
   assert_symlink_target \
     "$home_dir/.pi/agent/extensions/excalidraw.ts" \
@@ -106,8 +106,8 @@ test_extension_conflict_requires_force() (
   home_dir=$(mktemp -d)
   trap 'rm -rf "$home_dir"' EXIT
 
-  mkdir -p "$home_dir/.pi/agent/extensions/subagents"
-  printf 'local-only\n' > "$home_dir/.pi/agent/extensions/subagents/index.ts"
+  mkdir -p "$home_dir/.pi/agent/extensions/fast-compaction"
+  printf 'local-only\n' > "$home_dir/.pi/agent/extensions/fast-compaction/index.ts"
 
   if output=$(run_install "$home_dir" 2>&1); then
     printf 'expected install to fail without --force\n' >&2
@@ -115,7 +115,7 @@ test_extension_conflict_requires_force() (
   fi
 
   case "$output" in
-    *"exists (use --force to replace): $home_dir/.pi/agent/extensions/subagents"*)
+    *"exists (use --force to replace): $home_dir/.pi/agent/extensions/fast-compaction"*)
       ;;
     *)
       printf 'unexpected error output:\n%s\n' "$output" >&2
@@ -126,8 +126,8 @@ test_extension_conflict_requires_force() (
   run_install "$home_dir" --force >/dev/null
 
   assert_symlink_target \
-    "$home_dir/.pi/agent/extensions/subagents" \
-    "$ROOT_DIR/extensions/subagents"
+    "$home_dir/.pi/agent/extensions/fast-compaction" \
+    "$ROOT_DIR/extensions/fast-compaction"
 )
 
 test_extension_file_conflict_requires_force() (
@@ -193,8 +193,8 @@ test_extension_target_root_symlink_requires_force() (
   }
 
   assert_symlink_target \
-    "$home_dir/.pi/agent/extensions/subagents" \
-    "$ROOT_DIR/extensions/subagents"
+    "$home_dir/.pi/agent/extensions/fast-compaction" \
+    "$ROOT_DIR/extensions/fast-compaction"
 )
 
 test_prune_removes_stale_extension_links() (
