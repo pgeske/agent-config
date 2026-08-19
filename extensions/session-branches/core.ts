@@ -168,7 +168,7 @@ function optionValue(tokens: string[], index: number, option: string): { value: 
 export function parseBranchCommandArgs(input: string): BranchCommandOptions {
 	const tokens = tokenizeArguments(input);
 	const options: BranchCommandOptions = {
-		fresh: false,
+		fresh: true,
 		newWindow: false,
 		help: false,
 	};
@@ -180,8 +180,8 @@ export function parseBranchCommandArgs(input: string): BranchCommandOptions {
 			positionalPrompt.push(...tokens.slice(index + 1));
 			break;
 		}
-		if (token === "--fresh") {
-			options.fresh = true;
+		if (token === "--with-context") {
+			options.fresh = false;
 			continue;
 		}
 		if (token === "--new-window") {

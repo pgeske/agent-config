@@ -226,6 +226,17 @@ async function setPaneOptions(exec: ExecCommand, paneId: string, paneOptions: Ar
 	}
 }
 
+// Rebalance the surviving split tree after this pane exits so branch stacks do
+// not retain the uneven sizes created by tmux's incremental split history.
+async function setPaneExitLayoutHook(exec: ExecCommand, paneId: string): Promise<void> {
+	const result = await exec(
+		"tmux",
+		["set-hook", "-p", "-t", paneId, "pane-exited", 'select-layout -E -t "#{window_id}"'],
+		{ timeout: TMUX_TIMEOUT_MS },
+	);
+	if (result.code !== 0) throw commandError(`Configuring layout cleanup for branch pane ${paneId}`, result);
+}
+
 async function setPaneMetadata(options: LaunchBranchOptions, paneId: string): Promise<void> {
 	const paneOptions: Array<[string, string]> = [
 		["@pi_branch_parent_session", options.parentSessionId],
@@ -237,6 +248,7 @@ async function setPaneMetadata(options: LaunchBranchOptions, paneId: string): Pr
 		["@pi_branch_created_at", options.createdAt],
 	];
 	await setPaneOptions(options.exec, paneId, paneOptions);
+	await setPaneExitLayoutHook(options.exec, paneId);
 }
 
 export async function syncCurrentPaneBranchMetadata(
@@ -270,6 +282,7 @@ export async function syncCurrentPaneBranchMetadata(
 		["@pi_branch_window_root_session", metadata.windowRootSessionId],
 		["@pi_branch_created_at", metadata.createdAt],
 	]);
+	await setPaneExitLayoutHook(exec, paneId);
 }
 
 export async function listActiveChildBranches(
@@ -369,6 +382,13 @@ export async function launchBranch(options: LaunchBranchOptions): Promise<{ pane
 	} catch (error) {
 		await killPane(options.exec, paneId);
 		throw error;
+	}
+
+	// Focus the new branch so the user lands in it immediately.
+	if (launchMode === "window") {
+		await options.exec("tmux", ["select-window", "-t", paneId], { timeout: TMUX_TIMEOUT_MS });
+	} else {
+		await options.exec("tmux", ["select-pane", "-t", paneId], { timeout: TMUX_TIMEOUT_MS });
 	}
 	return { paneId, launchMode };
 }
