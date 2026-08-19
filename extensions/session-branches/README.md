@@ -7,18 +7,18 @@ Parallel Pi conversation branches in tmux with explicit context merges back into
 ### `/branch`
 
 ```text
-/branch [--fresh] [--new-window] [--name "topic"] [--prompt "task"]
+/branch [--with-context] [--new-window] [--name "topic"] [--prompt "task"]
 ```
 
-Creates a separate Pi session and launches it in tmux. When the parent is idle, it branches from the current leaf. When the parent agent is working, the request executes after the next tool call finishes and branches from the last completed turn, excluding the active partial turn and its tool calls. If the active run ends without another tool call, the branch starts at agent completion.
+Creates a fresh Pi session and launches it in tmux. The parent fork point is the current leaf when idle or the latest completed turn when the parent agent is working, excluding any active partial turn and incomplete tool calls. The fork point is retained for merging even when the new branch does not inherit its conversation.
 
 - The first same-window branch opens to the right of the parent pane.
 - Later same-window branches stack on the right, newest on top.
 - `--new-window` creates a named tmux window instead.
-- `--fresh` starts without inherited conversation history.
+- `--with-context` seeds the branch with the parent conversation through the fork point.
 - `--name` sets the Pi session name. The default is `<parent>-branch-<n>`.
 - `--prompt` submits an initial task after the branch starts.
-- Prompt text may also be written positionally, for example `/branch --fresh investigate this failure`.
+- Prompt text may also be written positionally, for example `/branch investigate this failure`.
 
 Session depth is unlimited. `--new-window` starts a new window-local layout root at any depth. Within one tmux window, only its root Pi pane may create child panes; a pane child must use `--new-window` to branch further. Pi's threaded session selector uses each branch's immediate `parentSession`, so nested branches appear as a recursive session tree.
 

@@ -101,11 +101,11 @@ function metadataFixture(overrides: Partial<BranchMetadata> = {}): BranchMetadat
 	} as BranchMetadata;
 }
 
-test("parseBranchCommandArgs supports quoted flags and a positional prompt", () => {
+test("parseBranchCommandArgs starts fresh unless parent context is explicitly requested", () => {
 	assert.deepEqual(
-		parseBranchCommandArgs('--fresh --new-window --name "OAuth design" investigate "token exchange"'),
+		parseBranchCommandArgs('--with-context --new-window --name "OAuth design" investigate "token exchange"'),
 		{
-			fresh: true,
+			fresh: false,
 			newWindow: true,
 			help: false,
 			name: "OAuth design",
@@ -113,7 +113,7 @@ test("parseBranchCommandArgs supports quoted flags and a positional prompt", () 
 		},
 	);
 	assert.deepEqual(parseBranchCommandArgs("--prompt='inspect a failure' --name=debug"), {
-		fresh: false,
+		fresh: true,
 		newWindow: false,
 		help: false,
 		name: "debug",
@@ -124,8 +124,9 @@ test("parseBranchCommandArgs supports quoted flags and a positional prompt", () 
 test("parseBranchCommandArgs rejects ambiguous and malformed input", () => {
 	assert.throws(() => parseBranchCommandArgs('--prompt "one" two'), /either --prompt or positional text/);
 	assert.throws(() => parseBranchCommandArgs("--unknown"), /Unknown option/);
+	assert.throws(() => parseBranchCommandArgs("--fresh"), /Unknown option/);
 	assert.throws(() => parseBranchCommandArgs('--name "unterminated'), /Unterminated/);
-	assert.throws(() => parseBranchCommandArgs("--prompt --fresh"), /requires a value/);
+	assert.throws(() => parseBranchCommandArgs("--prompt --with-context"), /requires a value/);
 });
 
 test("branch names are stable, bounded, and tmux-safe", () => {
@@ -434,7 +435,7 @@ test("legacy branch metadata remains compatible with a version-one parent runtim
 	}
 });
 
-test("a nested busy /branch starts after the next tool and excludes the active partial turn", async () => {
+test("a nested busy /branch --with-context starts immediately and excludes the active partial turn", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "session-branch-steer-test-"));
 	const runtimeDirectory = await mkdtemp("/tmp/sb-steer-");
 	const parentFile = join(directory, "parent.jsonl");
@@ -484,6 +485,9 @@ test("a nested busy /branch starts after the next tool and excludes the active p
 			registerCommand(name: string, command: { handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> }) {
 				commands.set(name, command);
 			},
+			registerShortcut(_shortcut: string, _options: { description?: string; handler: (ctx: ExtensionContext) => Promise<void> | void }) {
+				// Shortcuts are not exercised in tests; register is a no-op.
+			},
 			exec: async (_command: string, args: string[]) => {
 				if (args[0] === "display-message") {
 					return { stdout: "$1\t@1\t%1\n", stderr: "", code: 0, killed: false };
@@ -532,17 +536,21 @@ test("a nested busy /branch starts after the next tool and excludes the active p
 		for (const handler of handlers.get("session_start") ?? []) await handler({}, context);
 		assert.equal(JSON.parse(await readFile(registryPathForSession("project-session"), "utf8")).pid, process.pid);
 		for (const handler of handlers.get("before_agent_start") ?? []) await handler({}, context);
+		sessionManager.appendMessage({ role: "user", content: "current request", timestamp: Date.now() });
+		const completedTurn = assistantEntry("completed-turn", "current-request", "completed current turn");
+		if (completedTurn.type !== "message" || completedTurn.message.role !== "assistant") {
+			throw new Error("Expected an assistant message entry");
+		}
+		sessionManager.appendMessage(completedTurn.message);
+		for (const handler of handlers.get("turn_end") ?? []) await handler({}, context);
 		sessionManager.appendMessage({ role: "user", content: "active partial request", timestamp: Date.now() });
 		idle = false;
-		await commands.get("branch")!.handler('--name "queued branch"', context);
-		assert.equal(splitCalls, 0);
+		await commands.get("branch")!.handler('--with-context --name "queued branch"', context);
+		assert.equal(splitCalls, 1);
 		assert.ok(
-			notifications.some((message) => message.includes("queued after the next tool call")),
+			notifications.some((message) => message.includes("Created queued branch")),
 			`notifications: ${notifications.join(" | ")}`,
 		);
-
-		for (const handler of handlers.get("tool_execution_end") ?? []) await handler({}, context);
-		assert.equal(splitCalls, 1);
 		const createdEntry = sessionManager
 			.getEntries()
 			.find((entry) => entry.type === "custom" && entry.customType === "session-branches/created");
@@ -565,6 +573,8 @@ test("a nested busy /branch starts after the next tool and excludes the active p
 			});
 		assert.ok(branchTexts.some((text) => text.includes("completed request")));
 		assert.ok(branchTexts.some((text) => text.includes("completed response")));
+		assert.ok(branchTexts.some((text) => text.includes("current request")));
+		assert.ok(branchTexts.some((text) => text.includes("completed current turn")));
 		assert.ok(branchTexts.every((text) => !text.includes("active partial request")));
 
 		idle = true;
