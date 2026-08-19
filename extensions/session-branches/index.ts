@@ -52,7 +52,8 @@ import {
 } from "./tmux.ts";
 
 const BRANCH_HELP = [
-	"Usage: /branch [--fresh] [--new-window] [--name \"topic\"] [--prompt \"task\"]",
+	"Usage: /branch [--with-context] [--new-window] [--name \"topic\"] [--prompt \"task\"]",
+	"Branches start fresh by default. Use --with-context to inherit the parent conversation.",
 	"You can also provide the prompt as positional text after the options.",
 ].join("\n");
 
@@ -114,7 +115,7 @@ function mergeAlreadyReceived(ctx: ExtensionContext, branchSessionId: string): b
 
 async function summarizeBranch(
 	entries: SessionEntry[],
-	ctx: ExtensionCommandContext,
+	ctx: ExtensionContext,
 ): Promise<BranchSummaryResult | undefined> {
 	if (!ctx.model) throw new Error("No model is selected for branch summarization");
 	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
@@ -153,15 +154,72 @@ async function summarizeBranch(
 	return result;
 }
 
+const PARENT_BUSY_PATTERN = "busy";
+const PARENT_POLL_INTERVAL_MS = 3_000;
+const PARENT_POLL_TIMEOUT_MS = 5 * 60_000;
+const MERGE_RETRY_INTERVAL_MS = 2_000;
+const MERGE_MAX_RETRIES = 3;
+
+type ParentReadyResult = "ready" | "aborted" | { error: string };
+
+// waitForParentReady polls the parent session until it is idle, showing a loader
+// the user can abort. The parent only persists merge messages when idle, so we
+// cannot inject while it is streaming.
+async function waitForParentReady(
+	ctx: ExtensionContext,
+	metadata: BranchMetadata,
+): Promise<ParentReadyResult> {
+	return ctx.ui.custom<ParentReadyResult>((tui, theme, _keybindings, done) => {
+		const loader = new BorderedLoader(tui, theme, "Waiting for parent session to become idle...");
+		let cancelled = false;
+		loader.onAbort = () => {
+			cancelled = true;
+			done("aborted");
+		};
+		void (async () => {
+			const deadline = Date.now() + PARENT_POLL_TIMEOUT_MS;
+			while (!cancelled && Date.now() < deadline) {
+				try {
+					await checkParentReady(metadata);
+					done("ready");
+					return;
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					if (!message.includes(PARENT_BUSY_PATTERN)) {
+						done({ error: message });
+						return;
+					}
+					await new Promise((r) => setTimeout(r, PARENT_POLL_INTERVAL_MS));
+				}
+			}
+			if (!cancelled) done({ error: "Timed out waiting for the parent session to become idle" });
+		})();
+		return loader;
+	});
+}
+
+// requestParentMergeWithRetry retries the merge delivery a few times in case the
+// parent starts a new turn between the readiness check and the merge request.
+async function requestParentMergeWithRetry(metadata: BranchMetadata, payload: MergePayload): Promise<void> {
+	let lastError: Error | undefined;
+	for (let attempt = 0; attempt <= MERGE_MAX_RETRIES; attempt += 1) {
+		try {
+			await requestParentMerge(metadata, payload);
+			return;
+		} catch (error) {
+			lastError = error instanceof Error ? error : new Error(String(error));
+			const message = lastError.message;
+			if (!message.includes(PARENT_BUSY_PATTERN) || attempt === MERGE_MAX_RETRIES) throw lastError;
+			await new Promise((r) => setTimeout(r, MERGE_RETRY_INTERVAL_MS));
+		}
+	}
+	throw lastError ?? new Error("Merge failed");
+}
+
 interface BranchBase {
 	sessionId: string;
 	entries: SessionEntry[];
 	leafId: string | null;
-}
-
-interface PendingBranch {
-	options: BranchCommandOptions;
-	base: BranchBase;
 }
 
 function sessionFilePath(sessionDir: string, createdAt: string, sessionId: string): string {
@@ -189,10 +247,8 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 	let activeContext: ExtensionContext | undefined;
 	let parentRuntime: ParentRuntime | undefined;
 	let tmuxContext: TmuxContext | undefined;
-	let activeRunBase: BranchBase | undefined;
+	let latestCompletedTurnBase: BranchBase | undefined;
 	let effectiveBranchMetadata: BranchMetadata | undefined;
-	let pendingFlush: Promise<void> | undefined;
-	const pendingBranches: PendingBranch[] = [];
 
 	const exec: ExecCommand = (command, args, options) => pi.exec(command, args, options);
 
@@ -290,26 +346,9 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 		};
 		pi.appendEntry(BRANCH_CREATED_TYPE, created);
 		ctx.ui.notify(
-			`Created ${branchName} in tmux ${launched.launchMode} ${launched.paneId}${commandOptions.fresh ? " with fresh context" : ""}`,
+			`Created ${branchName} in tmux ${launched.launchMode} ${launched.paneId}${commandOptions.fresh ? "" : " with parent context"}`,
 			"info",
 		);
-	};
-
-	const flushPendingBranches = async (ctx: ExtensionContext): Promise<void> => {
-		while (pendingBranches.length > 0 || pendingFlush) {
-			if (pendingFlush) {
-				await pendingFlush;
-				continue;
-			}
-			const pending = pendingBranches.shift();
-			if (!pending) return;
-			pendingFlush = createBranch(ctx, pending.options, pending.base).catch((error) => notifyError(ctx, error));
-			try {
-				await pendingFlush;
-			} finally {
-				pendingFlush = undefined;
-			}
-		}
 	};
 
 	const assertNoActiveChildren = async (ctx: ExtensionContext): Promise<void> => {
@@ -325,10 +364,8 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 		activeContext = ctx;
 		parentRuntime = undefined;
 		tmuxContext = undefined;
-		activeRunBase = undefined;
+		latestCompletedTurnBase = captureBranchBase(ctx);
 		effectiveBranchMetadata = undefined;
-		pendingFlush = undefined;
-		pendingBranches.length = 0;
 
 		let branch;
 		try {
@@ -437,25 +474,23 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 
 	pi.on("session_shutdown", async () => {
 		activeContext = undefined;
-		activeRunBase = undefined;
+		latestCompletedTurnBase = undefined;
 		effectiveBranchMetadata = undefined;
-		pendingBranches.length = 0;
 		const runtime = parentRuntime;
 		parentRuntime = undefined;
 		tmuxContext = undefined;
 		if (runtime) await runtime.stop();
 	});
 
+	// Capture only complete conversation boundaries. During an active turn, the
+	// latest persisted assistant message may contain tool calls whose results do
+	// not exist yet and cannot safely seed another model conversation.
 	pi.on("before_agent_start", (_event, ctx) => {
-		activeRunBase = captureBranchBase(ctx);
+		latestCompletedTurnBase = captureBranchBase(ctx);
 	});
 
-	pi.on("tool_execution_end", async (_event, ctx) => {
-		if (pendingBranches.length > 0) await flushPendingBranches(ctx);
-	});
-
-	pi.on("agent_end", async (_event, ctx) => {
-		if (pendingBranches.length > 0) await flushPendingBranches(ctx);
+	pi.on("turn_end", (_event, ctx) => {
+		latestCompletedTurnBase = captureBranchBase(ctx);
 	});
 
 	pi.on("session_before_fork", (_event, ctx) => {
@@ -473,45 +508,127 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 		return { cancel: true };
 	});
 
+	// Shared handler bodies so commands and shortcuts run the same logic.
+	const branchCommand = async (args: string, ctx: ExtensionContext): Promise<void> => {
+		try {
+			if (!ctx.hasUI) throw new Error("/branch requires interactive Pi mode");
+			if (!parentRuntime || !tmuxContext) throw new Error("/branch requires an active parent runtime inside tmux");
+
+			const commandOptions = parseBranchCommandArgs(args);
+			if (commandOptions.help) {
+				ctx.ui.notify(BRANCH_HELP, "info");
+				return;
+			}
+			childBranchPlacement({
+				parentSessionId: ctx.sessionManager.getSessionId(),
+				parentMetadata: currentBranchMetadata(ctx)?.metadata,
+				branchSessionId: "pending",
+				newWindow: commandOptions.newWindow,
+			});
+
+			const base = ctx.isIdle() ? captureBranchBase(ctx) : latestCompletedTurnBase;
+			if (!base || base.sessionId !== ctx.sessionManager.getSessionId()) {
+				throw new Error("Cannot identify the last completed turn for the active agent run");
+			}
+			await createBranch(ctx, commandOptions, base);
+		} catch (error) {
+			notifyError(ctx, error);
+		}
+	};
+
+	const performMerge = async (ctx: ExtensionContext): Promise<boolean> => {
+		try {
+			if (!ctx.hasUI || !process.env.TMUX || !process.env.TMUX_PANE) {
+				throw new Error("/merge requires an interactive branch running inside tmux");
+			}
+			const branch = currentBranchMetadata(ctx);
+			if (!branch) throw new Error("/merge is only available in a session created by /branch");
+			if (!activeBranchMetadata(ctx)) throw new Error("The active branch no longer contains its fork marker");
+			await assertNoActiveChildren(ctx);
+			const branchEntries = entriesAfterBranchPoint(ctx.sessionManager.getBranch(), branch.entryId);
+			if (!hasMergeableContent(branchEntries)) throw new Error("This branch has no conversation to merge");
+			const parentReady = await waitForParentReady(ctx, branch.metadata);
+			if (parentReady !== "ready") {
+				if (parentReady === "aborted") {
+					ctx.ui.notify("Branch merge cancelled", "info");
+				} else {
+					throw new Error(parentReady.error);
+				}
+				return false;
+			}
+
+			const summaryResult = await summarizeBranch(branchEntries, ctx);
+			if (!summaryResult) {
+				ctx.ui.notify("Branch merge cancelled", "info");
+				return false;
+			}
+			if (summaryResult.aborted) {
+				ctx.ui.notify("Branch merge cancelled", "info");
+				return false;
+			}
+			if (summaryResult.error) throw new Error(`Branch summarization failed: ${summaryResult.error}`);
+			if (!summaryResult.summary) throw new Error("Branch summarization returned no summary");
+
+			const details: BranchMergeDetails = {
+				version: BRANCH_PROTOCOL_VERSION,
+				depth: branch.metadata.depth,
+				windowDepth: branch.metadata.windowDepth,
+				branchSessionId: branch.metadata.branchSessionId,
+				branchSessionFile: branch.metadata.branchSessionFile,
+				branchName: branch.metadata.branchName,
+				branchNumber: branch.metadata.branchNumber,
+				forkEntryId: branch.metadata.forkEntryId,
+				fresh: branch.metadata.fresh,
+				mergedAt: new Date().toISOString(),
+				readFiles: summaryResult.readFiles ?? [],
+				modifiedFiles: summaryResult.modifiedFiles ?? [],
+			};
+			await requestParentMergeWithRetry(branch.metadata, {
+				metadata: branch.metadata,
+				summary: summaryResult.summary,
+				details,
+			});
+			ctx.ui.notify(`Merged ${branch.metadata.branchName} into its parent session`, "info");
+			ctx.shutdown();
+			return true;
+		} catch (error) {
+			notifyError(ctx, error);
+			return false;
+		}
+	};
+
+	const performDiscard = async (ctx: ExtensionContext): Promise<boolean> => {
+		try {
+			if (!ctx.hasUI || !process.env.TMUX || !process.env.TMUX_PANE) {
+				throw new Error("/discard requires an interactive branch running inside tmux");
+			}
+			const branch = currentBranchMetadata(ctx);
+			if (!branch) throw new Error("/discard is only available in a session created by /branch");
+			await assertNoActiveChildren(ctx);
+			const confirmed = await ctx.ui.confirm(
+				"Discard branch?",
+				`Close ${branch.metadata.branchName} without merging? Its Pi session file will be retained.`,
+			);
+			if (!confirmed) return false;
+			ctx.ui.notify(`Closed ${branch.metadata.branchName} without merging`, "info");
+			ctx.shutdown();
+			return true;
+		} catch (error) {
+			notifyError(ctx, error);
+			return false;
+		}
+	};
+
 	pi.registerCommand("branch", {
-		description: "Fork the current Pi session into a parallel tmux pane or window",
+		description: "Start a fresh parallel Pi session in a tmux pane or window",
 		getArgumentCompletions: (prefix) => {
 			const option = prefix.split(/\s+/).at(-1) ?? "";
 			if (!option.startsWith("-")) return null;
-			const values = ["--fresh", "--new-window", "--name", "--prompt", "--help"];
+			const values = ["--with-context", "--new-window", "--name", "--prompt", "--help"];
 			const matches = values.filter((value) => value.startsWith(option));
 			return matches.length > 0 ? matches.map((value) => ({ value, label: value })) : null;
 		},
-		handler: async (args, ctx) => {
-			try {
-				if (!ctx.hasUI) throw new Error("/branch requires interactive Pi mode");
-				if (!parentRuntime || !tmuxContext) throw new Error("/branch requires an active parent runtime inside tmux");
-
-				const commandOptions = parseBranchCommandArgs(args);
-				if (commandOptions.help) {
-					ctx.ui.notify(BRANCH_HELP, "info");
-					return;
-				}
-				childBranchPlacement({
-					parentSessionId: ctx.sessionManager.getSessionId(),
-					parentMetadata: currentBranchMetadata(ctx)?.metadata,
-					branchSessionId: "pending",
-					newWindow: commandOptions.newWindow,
-				});
-
-				if (ctx.isIdle()) {
-					await createBranch(ctx, commandOptions, captureBranchBase(ctx));
-					return;
-				}
-				if (!activeRunBase || activeRunBase.sessionId !== ctx.sessionManager.getSessionId()) {
-					throw new Error("Cannot identify the last completed turn for the active agent run");
-				}
-				pendingBranches.push({ options: commandOptions, base: activeRunBase });
-				ctx.ui.notify("Branch queued after the next tool call from the last completed turn", "info");
-			} catch (error) {
-				notifyError(ctx, error);
-			}
-		},
+		handler: (args, ctx) => branchCommand(args, ctx),
 	});
 
 	pi.registerCommand("detach", {
@@ -559,78 +676,56 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 	pi.registerCommand("merge", {
 		description: "Summarize this parallel branch into its active parent session, then close it",
 		handler: async (_args, ctx) => {
-			try {
-				await ctx.waitForIdle();
-				if (!ctx.hasUI || !process.env.TMUX || !process.env.TMUX_PANE) {
-					throw new Error("/merge requires an interactive branch running inside tmux");
-				}
-				const branch = currentBranchMetadata(ctx);
-				if (!branch) throw new Error("/merge is only available in a session created by /branch");
-				if (!activeBranchMetadata(ctx)) throw new Error("The active branch no longer contains its fork marker");
-				await assertNoActiveChildren(ctx);
-				const branchEntries = entriesAfterBranchPoint(ctx.sessionManager.getBranch(), branch.entryId);
-				if (!hasMergeableContent(branchEntries)) throw new Error("This branch has no conversation to merge");
-				await checkParentReady(branch.metadata);
-
-				const summaryResult = await summarizeBranch(branchEntries, ctx);
-				if (!summaryResult) {
-					ctx.ui.notify("Branch merge cancelled", "info");
-					return;
-				}
-				if (summaryResult.aborted) {
-					ctx.ui.notify("Branch merge cancelled", "info");
-					return;
-				}
-				if (summaryResult.error) throw new Error(`Branch summarization failed: ${summaryResult.error}`);
-				if (!summaryResult.summary) throw new Error("Branch summarization returned no summary");
-
-				const details: BranchMergeDetails = {
-					version: BRANCH_PROTOCOL_VERSION,
-					depth: branch.metadata.depth,
-					windowDepth: branch.metadata.windowDepth,
-					branchSessionId: branch.metadata.branchSessionId,
-					branchSessionFile: branch.metadata.branchSessionFile,
-					branchName: branch.metadata.branchName,
-					branchNumber: branch.metadata.branchNumber,
-					forkEntryId: branch.metadata.forkEntryId,
-					fresh: branch.metadata.fresh,
-					mergedAt: new Date().toISOString(),
-					readFiles: summaryResult.readFiles ?? [],
-					modifiedFiles: summaryResult.modifiedFiles ?? [],
-				};
-				await requestParentMerge(branch.metadata, {
-					metadata: branch.metadata,
-					summary: summaryResult.summary,
-					details,
-				});
-				ctx.ui.notify(`Merged ${branch.metadata.branchName} into its parent session`, "info");
-				ctx.shutdown();
-			} catch (error) {
-				notifyError(ctx, error);
-			}
+			await ctx.waitForIdle();
+			await performMerge(ctx);
 		},
 	});
 
 	pi.registerCommand("discard", {
 		description: "Close this parallel branch without merging it; the session file is retained",
 		handler: async (_args, ctx) => {
-			try {
-				await ctx.waitForIdle();
-				if (!ctx.hasUI || !process.env.TMUX || !process.env.TMUX_PANE) {
-					throw new Error("/discard requires an interactive branch running inside tmux");
-				}
-				const branch = currentBranchMetadata(ctx);
-				if (!branch) throw new Error("/discard is only available in a session created by /branch");
-				await assertNoActiveChildren(ctx);
-				const confirmed = await ctx.ui.confirm(
-					"Discard branch?",
-					`Close ${branch.metadata.branchName} without merging? Its Pi session file will be retained.`,
-				);
-				if (!confirmed) return;
-				ctx.ui.notify(`Closed ${branch.metadata.branchName} without merging`, "info");
-				ctx.shutdown();
-			} catch (error) {
-				notifyError(ctx, error);
+			await ctx.waitForIdle();
+			await performDiscard(ctx);
+		},
+	});
+
+	pi.registerShortcut("ctrl+'", {
+		description: "Start a parallel branch",
+		handler: (ctx) => branchCommand("", ctx),
+	});
+
+	pi.registerShortcut("ctrl+shift+'", {
+		description: "Start a parallel branch in a new window",
+		handler: (ctx) => branchCommand("--new-window", ctx),
+	});
+
+	pi.registerShortcut("ctrl+\\", {
+		description: "Merge this branch into its parent session",
+		handler: async (ctx) => {
+			if (!ctx.isIdle()) {
+				ctx.ui.notify("Wait for the current turn to finish before merging", "info");
+				return;
+			}
+			const merged = await performMerge(ctx);
+			// The shortcut context's shutdown() only sets a flag that is checked on the
+			// next agent_settled event, which has already fired. Kill the pane
+			// directly so the branch actually closes.
+			if (merged && process.env.TMUX_PANE) {
+				await exec("tmux", ["kill-pane", "-t", process.env.TMUX_PANE]);
+			}
+		},
+	});
+
+	pi.registerShortcut("ctrl+delete", {
+		description: "Discard this branch without merging",
+		handler: async (ctx) => {
+			if (!ctx.isIdle()) {
+				ctx.ui.notify("Wait for the current turn to finish before discarding", "info");
+				return;
+			}
+			const discarded = await performDiscard(ctx);
+			if (discarded && process.env.TMUX_PANE) {
+				await exec("tmux", ["kill-pane", "-t", process.env.TMUX_PANE]);
 			}
 		},
 	});
