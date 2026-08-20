@@ -17,6 +17,7 @@ export interface BranchCommandOptions {
 	newWindow: boolean;
 	name?: string;
 	prompt?: string;
+	cwd?: string;
 	help: boolean;
 }
 
@@ -204,6 +205,12 @@ export function parseBranchCommandArgs(input: string): BranchCommandOptions {
 			index = parsed.nextIndex;
 			continue;
 		}
+		if (token === "--cwd" || token.startsWith("--cwd=")) {
+			const parsed = optionValue(tokens, index, "--cwd");
+			options.cwd = parsed.value.trim();
+			index = parsed.nextIndex;
+			continue;
+		}
 		if (token.startsWith("-")) throw new Error(`Unknown option: ${token}`);
 		positionalPrompt.push(token);
 	}
@@ -216,6 +223,7 @@ export function parseBranchCommandArgs(input: string): BranchCommandOptions {
 	}
 	if (options.name !== undefined && !options.name) throw new Error("--name cannot be empty");
 	if (options.prompt !== undefined && !options.prompt) throw new Error("--prompt cannot be empty");
+	if (options.cwd !== undefined && !options.cwd) throw new Error("--cwd cannot be empty");
 	return options;
 }
 

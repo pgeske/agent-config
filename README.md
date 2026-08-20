@@ -60,7 +60,7 @@ npm run sync:dry-run
 - `/branch`, `/merge`, `/detach`, and `/branches` provide tmux-backed parallel session branches.
 - `/handoff` writes a self-contained session handoff into the notes vault.
 - `/config-sync` reapplies the managed machine configuration.
-- MCP adapter, Peekaboo macOS computer use, fast compaction, autocomplete layout, Codex image generation, voice bridge, tmux notification, Excalidraw, Codex review, and background subagent extensions are included.
+- MCP adapter, Peekaboo macOS computer use, fast compaction, autocomplete layout, Codex image generation, voice bridge, tmux notification, Excalidraw, and Codex review extensions are included.
 
 Stable Pi is pinned to `0.84.1`. The experimental Pi source is pinned to commit [`28657a2ffa6dbeccba74c166682e7a7ee547f5b4`](https://github.com/badlogic/pi-mono/commit/28657a2ffa6dbeccba74c166682e7a7ee547f5b4) and built under `~/.pi/experimental/pi-main-28657a2`.
 

@@ -49,15 +49,15 @@ These are personal global rules applied to AI coding sessions across tools.
 - When inspecting current behavior, use the latest default branch unless the user requests a specific branch or PR.
 - Do not run autoreview unless the user explicitly asks for it.
 
-## Tmux and Subagents
+## Delegation and Concurrent Repository Work
 
-- When asked to spin up a subagent, use a separate Pi session in tmux and follow the `tmux-subagent` skill.
-- Start subagents from `~` by default unless a specific repository or worktree is requested.
-- For a same-window subagent, create or stack a right-side pane in the window that was active when requested.
-- For a new-window subagent, use a concise human-readable tmux window name and matching `pi --name` session name.
-- Always use stable tmux pane/window IDs for create, close, rename, and send-keys operations; never rely on the implicit current pane.
-- For follow-up prompts, use a one-line instruction or write detailed text to a temporary file and tell the subagent to read it.
-- Subagents must return a concise result in their session; local files may be supporting artifacts but not the only deliverable.
+- Assume other agents may be working in the same repository. Treat pre-existing changes as potentially theirs: do not revert, delete, overwrite, or reformat unrelated work, and re-check status before editing shared files.
+- Run concurrent file-modifying work in separate Git worktrees whenever the repository supports them. Read-only investigation may share the current checkout.
+- In Pi, when asked to delegate work to subagents, use the session-branches `branch` tool (the model-callable counterpart to `/branch`), not manual tmux commands. If that tool is unavailable, say so rather than emulating it.
+- For several independent tasks, pass all tasks in one `branch` call so it creates one named branch per task. Give every task a concise `name` and a self-contained `prompt`.
+- Preserve branch defaults unless the user asks otherwise: omit `withContext` for a fresh session and omit `newWindow` for same-window panes.
+- Before delegating file changes, create one dedicated worktree per task and wait for worktree creation to finish; then pass its absolute path as that task's `cwd`.
+- When running inside a delegated branch, finish and validate the assigned task, then use `merge_branch` to send the handoff to the parent and close the branch.
 
 ## Git Preferences
 
@@ -87,5 +87,5 @@ These are personal global rules applied to AI coding sessions across tools.
 - Use `gather-context` before broad searches when the answer may depend on shell history, notes, or repositories outside the current workspace.
 - Use `agent-config-workflow` when editing shared agent configuration.
 - Use `design-doc-writing` when drafting or editing a design document or RFC.
-- Use `peekaboo` for native macOS GUI inspection and automation; use `agent-browser` for browser-only work.
+- Native macOS GUI automation is disabled unless explicitly re-enabled; use `agent-browser` for browser-only work.
 - Personal repositories normally live under `~/repositories`; shared agent configuration lives under `~/agent-config`.

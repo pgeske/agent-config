@@ -13,7 +13,6 @@ Use this skill to choose the fastest, highest-signal context sources before fall
 
 - Use this skill when the request likely depends on prior local activity, personal notes, repo knowledge, or other context not already present in the current file or working tree.
 - Use it before broad scans like grepping `~` or reading large docs when a narrower local source is more likely to answer the question.
-- Use it when multiple sources are plausible and parallel subagents can reduce latency.
 
 ## Do not use
 
@@ -59,12 +58,6 @@ Use this skill to choose the fastest, highest-signal context sources before fall
 ### Public knowledge questions
 
 - If the request is mostly public and local context is unlikely to matter, use normal web and repo inspection paths without forcing this skill.
-
-## Parallel subagents
-
-- When two or three sources are genuinely plausible, launch one subagent per source and gather results in parallel.
-- Good pairs: notes plus repo resolution, history plus repo resolution, notes plus current repo.
-- Do not launch subagents just to search adjacent low-value sources or large generic directories.
 
 ## Suggested workflow
 

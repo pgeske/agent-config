@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import {
 	BorderedLoader,
@@ -10,6 +10,8 @@ import {
 	type ExtensionContext,
 	type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+import { BranchNameDialog } from "./branch-name-dialog.ts";
 import {
 	BRANCH_CREATED_TYPE,
 	BRANCH_MERGE_MESSAGE_TYPE,
@@ -52,10 +54,34 @@ import {
 } from "./tmux.ts";
 
 const BRANCH_HELP = [
-	"Usage: /branch [--with-context] [--new-window] [--name \"topic\"] [--prompt \"task\"]",
-	"Branches start fresh by default. Use --with-context to inherit the parent conversation.",
+	"Usage: /branch [--with-context] [--new-window] [--name \"topic\"] [--cwd \"path\"] [--prompt \"task\"]",
+	"Branches start fresh in the current working directory by default.",
+	"Omit --name to enter the session name in a centered dialog.",
+	"Use --with-context to inherit the parent conversation or --cwd to launch in another existing directory.",
 	"You can also provide the prompt as positional text after the options.",
 ].join("\n");
+
+const BranchTaskSchema = Type.Object({
+	name: Type.String({ description: "Concise, descriptive Pi session name", minLength: 1, maxLength: 80 }),
+	prompt: Type.String({ description: "Self-contained task prompt for the branch", minLength: 1 }),
+	cwd: Type.Optional(
+		Type.String({ description: "Existing working directory for the branch, preferably a dedicated Git worktree" }),
+	),
+	withContext: Type.Optional(
+		Type.Boolean({ description: "Inherit the parent conversation. Default: false (start fresh)." }),
+	),
+	newWindow: Type.Optional(
+		Type.Boolean({ description: "Launch in a new tmux window. Default: false (same-window pane)." }),
+	),
+});
+
+const BranchToolParams = Type.Object({
+	tasks: Type.Array(BranchTaskSchema, {
+		description: "Independent tasks to launch as parallel Pi session branches",
+		minItems: 1,
+		maxItems: 8,
+	}),
+});
 
 const MERGE_SUMMARY_INSTRUCTIONS = `Create a concise, self-contained handoff for merging this parallel Pi branch into its parent session.
 
@@ -267,6 +293,15 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 			throw new Error("The parent Pi session changed before the queued branch could start");
 		}
 
+		const branchCwd = commandOptions.cwd ? resolve(ctx.cwd, commandOptions.cwd) : ctx.cwd;
+		let branchCwdStat;
+		try {
+			branchCwdStat = await stat(branchCwd);
+		} catch {
+			throw new Error(`Branch working directory does not exist: ${branchCwd}`);
+		}
+		if (!branchCwdStat.isDirectory()) throw new Error(`Branch working directory is not a directory: ${branchCwd}`);
+
 		const parentSessionFile = ctx.sessionManager.getSessionFile();
 		if (!parentSessionFile) throw new Error("/branch requires a persisted Pi session");
 		const branchNumber = countCreatedBranches(ctx.sessionManager.getEntries()) + 1;
@@ -287,7 +322,7 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 			parentEntries: base.entries,
 			parentSessionId: ctx.sessionManager.getSessionId(),
 			parentSessionFile: resolve(parentSessionFile),
-			cwd: ctx.cwd,
+			cwd: branchCwd,
 			forkEntryId: base.leafId,
 			branchSessionId,
 			branchSessionFile,
@@ -317,7 +352,7 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 				depth: placement.depth,
 				windowDepth: placement.windowDepth,
 				windowRootSessionId: placement.windowRootSessionId,
-				cwd: ctx.cwd,
+				cwd: branchCwd,
 				prompt: commandOptions.prompt,
 				model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
 				thinkingLevel: pi.getThinkingLevel(),
@@ -349,6 +384,7 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 			`Created ${branchName} in tmux ${launched.launchMode} ${launched.paneId}${commandOptions.fresh ? "" : " with parent context"}`,
 			"info",
 		);
+		return { branchName, cwd: branchCwd, paneId: launched.paneId, launchMode: launched.launchMode };
 	};
 
 	const assertNoActiveChildren = async (ctx: ExtensionContext): Promise<void> => {
@@ -511,13 +547,40 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 	// Shared handler bodies so commands and shortcuts run the same logic.
 	const branchCommand = async (args: string, ctx: ExtensionContext): Promise<void> => {
 		try {
-			if (!ctx.hasUI) throw new Error("/branch requires interactive Pi mode");
+			if (!ctx.hasUI || ctx.mode !== "tui") throw new Error("/branch requires interactive Pi mode");
 			if (!parentRuntime || !tmuxContext) throw new Error("/branch requires an active parent runtime inside tmux");
 
-			const commandOptions = parseBranchCommandArgs(args);
+			let commandOptions = parseBranchCommandArgs(args);
 			if (commandOptions.help) {
 				ctx.ui.notify(BRANCH_HELP, "info");
 				return;
+			}
+			if (!commandOptions.name) {
+				const branchName = await ctx.ui.custom<string | undefined>(
+					(tui, theme, keybindings, done) => {
+						const dialog = new BranchNameDialog(theme, keybindings, done);
+						return {
+							get focused() {
+								return dialog.focused;
+							},
+							set focused(value: boolean) {
+								dialog.focused = value;
+							},
+							render: (width) => dialog.render(width),
+							invalidate: () => dialog.invalidate(),
+							handleInput: (data) => {
+								dialog.handleInput(data);
+								tui.requestRender();
+							},
+						};
+					},
+					{
+						overlay: true,
+						overlayOptions: { anchor: "center", width: 48, margin: 1 },
+					},
+				);
+				if (!branchName) return;
+				commandOptions = { ...commandOptions, name: normalizeBranchName(branchName) };
 			}
 			childBranchPlacement({
 				parentSessionId: ctx.sessionManager.getSessionId(),
@@ -619,12 +682,95 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 		}
 	};
 
+	pi.registerTool({
+		name: "branch",
+		label: "Branch",
+		description:
+			"Launch one or more independent tasks as interactive Pi session branches. Each task gets a named session and prompt. Branches start fresh in same-window tmux panes unless withContext or newWindow is explicitly set. Use cwd to isolate file-modifying work in an existing Git worktree.",
+		promptSnippet: "Delegate one or more independent tasks to named parallel Pi session branches",
+		promptGuidelines: [
+			"Use branch when the user asks to delegate work to subagents or parallel agents.",
+			"Pass all independent tasks in one branch call, give each task a concise name and self-contained prompt, and preserve the fresh same-window defaults unless the user requests otherwise.",
+			"For file-modifying repository tasks, create separate Git worktrees before calling branch, then pass each worktree through that task's cwd.",
+		],
+		parameters: BranchToolParams,
+		async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+			if (signal?.aborted) throw new Error("Branch creation was cancelled");
+			if (!ctx.hasUI) throw new Error("branch requires interactive Pi mode");
+			if (!parentRuntime || !tmuxContext) throw new Error("branch requires an active parent runtime inside tmux");
+
+			const base = ctx.isIdle() ? captureBranchBase(ctx) : latestCompletedTurnBase;
+			if (!base || base.sessionId !== ctx.sessionManager.getSessionId()) {
+				throw new Error("Cannot identify the last completed turn for the active agent run");
+			}
+
+			const launched = [];
+			for (const task of params.tasks) {
+				if (signal?.aborted) throw new Error("Branch creation was cancelled");
+				const name = task.name.trim();
+				const prompt = task.prompt.trim();
+				if (!name) throw new Error("Every branch task requires a non-empty name");
+				if (!prompt) throw new Error(`Branch ${name} requires a non-empty prompt`);
+				launched.push(
+					await createBranch(
+						ctx,
+						{
+							fresh: !(task.withContext ?? false),
+							newWindow: task.newWindow ?? false,
+							name,
+							prompt,
+							cwd: task.cwd,
+							help: false,
+						},
+						base,
+					),
+				);
+			}
+
+			return {
+				content: [
+					{
+						type: "text",
+						text: `Created ${launched.length} branch${launched.length === 1 ? "" : "es"}: ${launched.map((branch) => `${branch.branchName} (${branch.launchMode} ${branch.paneId}, ${branch.cwd})`).join(", ")}`,
+					},
+				],
+				details: { branches: launched },
+			};
+		},
+	});
+
+	pi.registerTool({
+		name: "merge_branch",
+		label: "Merge Branch",
+		description: "Summarize the completed work in a /branch-created session, deliver it to the parent session, and close the branch.",
+		promptSnippet: "Merge a completed Pi session branch back into its parent",
+		promptGuidelines: [
+			"Use merge_branch after completing and validating a delegated task in a session created by branch.",
+		],
+		parameters: Type.Object({}),
+		async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+			const merged = await performMerge(ctx);
+			return {
+				content: [
+					{
+						type: "text",
+						text: merged
+							? "Merged this branch into its parent session and requested branch shutdown."
+							: "The branch was not merged. Resolve the reported issue and retry merge_branch.",
+					},
+				],
+				details: { merged },
+				terminate: merged,
+			};
+		},
+	});
+
 	pi.registerCommand("branch", {
 		description: "Start a fresh parallel Pi session in a tmux pane or window",
 		getArgumentCompletions: (prefix) => {
 			const option = prefix.split(/\s+/).at(-1) ?? "";
 			if (!option.startsWith("-")) return null;
-			const values = ["--with-context", "--new-window", "--name", "--prompt", "--help"];
+			const values = ["--with-context", "--new-window", "--name", "--cwd", "--prompt", "--help"];
 			const matches = values.filter((value) => value.startsWith(option));
 			return matches.length > 0 ? matches.map((value) => ({ value, label: value })) : null;
 		},
@@ -689,17 +835,17 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 		},
 	});
 
-	pi.registerShortcut("ctrl+'", {
-		description: "Start a parallel branch",
+	pi.registerShortcut("ctrl+n", {
+		description: "Start a parallel branch in the current tmux window",
 		handler: (ctx) => branchCommand("", ctx),
 	});
 
-	pi.registerShortcut("ctrl+shift+'", {
-		description: "Start a parallel branch in a new window",
+	pi.registerShortcut("ctrl+shift+n", {
+		description: "Start a parallel branch in a new tmux window",
 		handler: (ctx) => branchCommand("--new-window", ctx),
 	});
 
-	pi.registerShortcut("ctrl+\\", {
+	pi.registerShortcut("ctrl+shift+m", {
 		description: "Merge this branch into its parent session",
 		handler: async (ctx) => {
 			if (!ctx.isIdle()) {
@@ -716,17 +862,4 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 		},
 	});
 
-	pi.registerShortcut("ctrl+delete", {
-		description: "Discard this branch without merging",
-		handler: async (ctx) => {
-			if (!ctx.isIdle()) {
-				ctx.ui.notify("Wait for the current turn to finish before discarding", "info");
-				return;
-			}
-			const discarded = await performDiscard(ctx);
-			if (discarded && process.env.TMUX_PANE) {
-				await exec("tmux", ["kill-pane", "-t", process.env.TMUX_PANE]);
-			}
-		},
-	});
 }
