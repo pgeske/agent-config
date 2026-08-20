@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -34,6 +34,8 @@ import {
 	startParentRuntime,
 	type MergePayload,
 } from "../extensions/session-branches/ipc.ts";
+import { visibleWidth } from "@earendil-works/pi-tui";
+import { BranchNameDialog } from "../extensions/session-branches/branch-name-dialog.ts";
 import sessionBranchesExtension from "../extensions/session-branches/index.ts";
 import {
 	detachPaneToWindow,
@@ -101,15 +103,48 @@ function metadataFixture(overrides: Partial<BranchMetadata> = {}): BranchMetadat
 	} as BranchMetadata;
 }
 
+test("branch name dialog submits a trimmed name and cancels with escape", () => {
+	const completed: Array<string | undefined> = [];
+	const theme = {
+		fg: (_color: string, text: string) => text,
+		bold: (text: string) => text,
+	} as never;
+	const keybindings = {
+		matches: (data: string, keybinding: string) =>
+			(keybinding === "tui.input.submit" && data === "\r") ||
+			(keybinding === "tui.select.cancel" && data === "\u001b"),
+	} as never;
+	const dialog = new BranchNameDialog(theme, keybindings, (name) => completed.push(name));
+	dialog.focused = true;
+
+	const initial = dialog.render(48);
+	assert.ok(initial.some((line) => line.includes("New branch")));
+	assert.ok(initial.every((line) => visibleWidth(line) <= 48));
+
+	dialog.handleInput("   release   review   ");
+	dialog.handleInput("\r");
+	assert.equal(completed.length, 1);
+	assert.equal(completed[0], "release review");
+
+	const empty = new BranchNameDialog(theme, keybindings, (name) => completed.push(name));
+	empty.handleInput("\r");
+	assert.ok(empty.render(48).some((line) => line.includes("Enter a branch name")));
+	empty.handleInput("\u001b");
+	assert.deepEqual(completed, ["release review", undefined]);
+});
+
 test("parseBranchCommandArgs starts fresh unless parent context is explicitly requested", () => {
 	assert.deepEqual(
-		parseBranchCommandArgs('--with-context --new-window --name "OAuth design" investigate "token exchange"'),
+		parseBranchCommandArgs(
+			'--with-context --new-window --name "OAuth design" --cwd ../oauth-worktree investigate "token exchange"',
+		),
 		{
 			fresh: false,
 			newWindow: true,
 			help: false,
 			name: "OAuth design",
 			prompt: "investigate token exchange",
+			cwd: "../oauth-worktree",
 		},
 	);
 	assert.deepEqual(parseBranchCommandArgs("--prompt='inspect a failure' --name=debug"), {
@@ -127,6 +162,7 @@ test("parseBranchCommandArgs rejects ambiguous and malformed input", () => {
 	assert.throws(() => parseBranchCommandArgs("--fresh"), /Unknown option/);
 	assert.throws(() => parseBranchCommandArgs('--name "unterminated'), /Unterminated/);
 	assert.throws(() => parseBranchCommandArgs("--prompt --with-context"), /requires a value/);
+	assert.throws(() => parseBranchCommandArgs('--cwd ""'), /--cwd cannot be empty/);
 });
 
 test("branch names are stable, bounded, and tmux-safe", () => {
@@ -473,9 +509,22 @@ test("a nested busy /branch --with-context starts immediately and excludes the a
 		const sessionManager = SessionManager.open(parentFile);
 		const handlers = new Map<string, Array<(event: unknown, ctx: ExtensionContext) => unknown>>();
 		const commands = new Map<string, { handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> }>();
+		const tools = new Map<
+			string,
+			{
+				execute: (
+					toolCallId: string,
+					params: Record<string, unknown>,
+					signal: AbortSignal | undefined,
+					onUpdate: undefined,
+					ctx: ExtensionContext,
+				) => Promise<{ content: Array<{ type: string; text: string }>; details?: unknown }>;
+			}
+		>();
 		const notifications: string[] = [];
+		const shortcuts = new Map<string, { description?: string; handler: (ctx: ExtensionContext) => Promise<void> | void }>();
 		let splitCalls = 0;
-		let childLaunched = false;
+		const childPaneIds: string[] = [];
 		let idle = true;
 
 		const fakePi = {
@@ -485,26 +534,48 @@ test("a nested busy /branch --with-context starts immediately and excludes the a
 			registerCommand(name: string, command: { handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> }) {
 				commands.set(name, command);
 			},
-			registerShortcut(_shortcut: string, _options: { description?: string; handler: (ctx: ExtensionContext) => Promise<void> | void }) {
-				// Shortcuts are not exercised in tests; register is a no-op.
+			registerTool(tool: {
+				name: string;
+				execute: (
+					toolCallId: string,
+					params: Record<string, unknown>,
+					signal: AbortSignal | undefined,
+					onUpdate: undefined,
+					ctx: ExtensionContext,
+				) => Promise<{ content: Array<{ type: string; text: string }>; details?: unknown }>;
+			}) {
+				tools.set(tool.name, tool);
+			},
+			registerShortcut(shortcut: string, options: { description?: string; handler: (ctx: ExtensionContext) => Promise<void> | void }) {
+				shortcuts.set(shortcut, options);
 			},
 			exec: async (_command: string, args: string[]) => {
 				if (args[0] === "display-message") {
 					return { stdout: "$1\t@1\t%1\n", stderr: "", code: 0, killed: false };
 				}
 				if (args[0] === "list-panes" && args.includes("-a")) {
-					const stdout = childLaunched
-						? "$1\t%2\t0\tproject-session\tnested-child\tqueued branch\n"
-						: "$1\t%1\t0\tmain-session\tproject-session\tproject\n";
+					const stdout =
+						childPaneIds.length > 0
+							? `$1\t${childPaneIds[0]}\t0\tproject-session\tnested-child\tqueued branch\n`
+							: "$1\t%1\t0\tmain-session\tproject-session\tproject\n";
 					return { stdout, stderr: "", code: 0, killed: false };
 				}
 				if (args[0] === "list-panes") {
-					return { stdout: "%1\t0\t0\t\n", stderr: "", code: 0, killed: false };
+					const branchPanes = childPaneIds
+						.map((paneId, index) => `${paneId}\t100\t${index * 10}\tproject-session`)
+						.join("\n");
+					return {
+						stdout: `%1\t0\t0\t${branchPanes ? `\n${branchPanes}` : ""}\n`,
+						stderr: "",
+						code: 0,
+						killed: false,
+					};
 				}
 				if (args[0] === "split-window") {
 					splitCalls += 1;
-					childLaunched = true;
-					return { stdout: "%2\n", stderr: "", code: 0, killed: false };
+					const paneId = `%${splitCalls + 1}`;
+					childPaneIds.push(paneId);
+					return { stdout: `${paneId}\n`, stderr: "", code: 0, killed: false };
 				}
 				return { stdout: "", stderr: "", code: 0, killed: false };
 			},
@@ -512,12 +583,16 @@ test("a nested busy /branch --with-context starts immediately and excludes the a
 			appendEntry: (customType: string, data: unknown) => sessionManager.appendCustomEntry(customType, data),
 		} as unknown as ExtensionAPI;
 		sessionBranchesExtension(fakePi);
+		assert.deepEqual([...tools.keys()].sort(), ["branch", "merge_branch"]);
+		assert.deepEqual([...shortcuts.keys()].sort(), ["ctrl+n", "ctrl+shift+m", "ctrl+shift+n"]);
 
 		const context = {
 			ui: {
 				notify: (message: string) => notifications.push(message),
+				custom: async () => "dialog branch",
 			},
 			hasUI: true,
+			mode: "tui",
 			cwd: directory,
 			sessionManager,
 			modelRegistry: {},
@@ -551,6 +626,49 @@ test("a nested busy /branch --with-context starts immediately and excludes the a
 			notifications.some((message) => message.includes("Created queued branch")),
 			`notifications: ${notifications.join(" | ")}`,
 		);
+
+		await shortcuts.get("ctrl+n")!.handler(context);
+		assert.equal(splitCalls, 2);
+		assert.ok(notifications.some((message) => message.includes("Created dialog branch")));
+
+		const worktreeDirectory = join(directory, "worktree-x");
+		await mkdir(worktreeDirectory);
+		const toolResult = await tools.get("branch")!.execute(
+			"branch-tool-call",
+			{
+				tasks: [
+					{ name: "research x", prompt: "Research x", cwd: worktreeDirectory },
+					{ name: "research y", prompt: "Research y" },
+					{ name: "research z", prompt: "Research z" },
+				],
+			},
+			undefined,
+			undefined,
+			context,
+		);
+		assert.equal(splitCalls, 5);
+		assert.match(toolResult.content[0].text, /Created 3 branches: research x.*research y.*research z/);
+		const createdEntries = sessionManager
+			.getEntries()
+			.filter((entry) => entry.type === "custom" && entry.customType === "session-branches/created");
+		assert.equal(createdEntries.length, 5);
+		const dialogBranchEntry = createdEntries[1];
+		assert.ok(dialogBranchEntry?.type === "custom");
+		assert.equal(
+			SessionManager.open((dialogBranchEntry.data as { branchSessionFile: string }).branchSessionFile).getSessionName(),
+			"dialog branch",
+		);
+		const toolBranchSessions = createdEntries.slice(2).map((entry) => {
+			if (entry.type !== "custom") throw new Error("Expected branch creation metadata");
+			return SessionManager.open((entry.data as { branchSessionFile: string }).branchSessionFile);
+		});
+		assert.equal(toolBranchSessions[0].getHeader()?.cwd, worktreeDirectory);
+		for (const branchSession of toolBranchSessions) {
+			const metadata = findBranchMetadata(branchSession.getEntries())?.metadata;
+			assert.equal(metadata?.fresh, true);
+			assert.equal(metadata?.launchMode, "pane");
+		}
+
 		const createdEntry = sessionManager
 			.getEntries()
 			.find((entry) => entry.type === "custom" && entry.customType === "session-branches/created");

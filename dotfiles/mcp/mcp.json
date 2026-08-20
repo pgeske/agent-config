@@ -4,6 +4,7 @@
   },
   "mcpServers": {
     "peekaboo": {
+      "disabled": true,
       "command": "peekaboo",
       "args": ["mcp", "--no-remote"],
       "lifecycle": "lazy-keep-alive",

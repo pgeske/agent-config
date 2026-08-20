@@ -51,8 +51,8 @@ test_install_all_creates_opencode_agents_symlink() (
     "$ROOT_DIR/AGENTS.md"
 
   assert_symlink_target \
-    "$home_dir/.pi/agent/skills/peekaboo" \
-    "$ROOT_DIR/skills/peekaboo"
+    "$home_dir/.pi/agent/skills/agent-browser" \
+    "$ROOT_DIR/skills/agent-browser"
 )
 
 test_named_gather_context_install_still_installs_agents() (
