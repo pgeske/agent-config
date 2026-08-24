@@ -43,8 +43,8 @@ Available only in a branch. It confirms and then closes the branch without sendi
 
 | Shortcut | Action |
 | --- | --- |
-| `Ctrl+N` | Name and create a branch in the current tmux window |
-| `Ctrl+Shift+N` | Name and create a branch in a new tmux window |
+| `Ctrl+N` | Name and create a branch in a new tmux window |
+| `Ctrl+Shift+N` | Name and create a branch in the current tmux window |
 | `Ctrl+Shift+M` | Merge the current branch into its parent |
 
 The merge shortcut is meaningful only inside a branch. Modified-key shortcuts require a terminal and tmux configured for the extended keyboard protocol; the shared tmux configuration enables `extended-keys` with `csi-u`.

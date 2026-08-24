@@ -357,7 +357,7 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 				model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
 				thinkingLevel: pi.getThinkingLevel(),
 				newWindow: commandOptions.newWindow,
-				windowName: `branch-${slugifyBranchName(branchName)}`,
+				windowName: slugifyBranchName(branchName),
 				createdAt,
 			});
 		} catch (error) {
@@ -793,7 +793,7 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 				const detached = await detachPaneToWindow(
 					exec,
 					tmuxContext,
-					`branch-${slugifyBranchName(branch.metadata.branchName)}`,
+					slugifyBranchName(branch.metadata.branchName),
 				);
 				const metadata = detachedBranchMetadata(branch.metadata);
 				tmuxContext = {
@@ -836,13 +836,13 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerShortcut("ctrl+n", {
-		description: "Start a parallel branch in the current tmux window",
-		handler: (ctx) => branchCommand("", ctx),
+		description: "Start a parallel branch in a new tmux window",
+		handler: (ctx) => branchCommand("--new-window", ctx),
 	});
 
 	pi.registerShortcut("ctrl+shift+n", {
-		description: "Start a parallel branch in a new tmux window",
-		handler: (ctx) => branchCommand("--new-window", ctx),
+		description: "Start a parallel branch in the current tmux window",
+		handler: (ctx) => branchCommand("", ctx),
 	});
 
 	pi.registerShortcut("ctrl+shift+m", {
