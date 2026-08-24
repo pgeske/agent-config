@@ -562,8 +562,10 @@ set-window-option -g window-status-current-style 'fg=#303446,bg=#8caaee,bold,und
 set-window-option -g window-status-activity-style 'fg=#c6d0f5,bg=#51576d,none,underscore,us=#737994'
 set-window-option -g window-status-last-style 'fg=#c6d0f5,bg=#51576d,none,underscore,us=#737994'
 set-window-option -g window-status-bell-style 'fg=#303446,bg=#e5c890,bold,underscore,us=#737994'
-set-window-option -g window-status-format ' #I #W#{?@pi_notify_label, #{@pi_notify_label},}#[fg=#737994]▕'
-set-window-option -g window-status-current-format ' #I #W#{?@pi_notify_label, #{@pi_notify_label},}#[fg=#737994]▕'
+# Keep tabs at a Chrome-like fixed 20-cell width. Reserve two cells for Pi
+# status so notification changes cannot resize a tab.
+set-window-option -g window-status-format ' #{=/14/…;p15:#{window_name}} #{=2;p2:#{@pi_notify_label}}#[fg=#737994]▕'
+set-window-option -g window-status-current-format ' #{=/14/…;p15:#{window_name}} #{=2;p2:#{@pi_notify_label}}#[fg=#737994]▕'
 
 # Easier mobile-friendly window selector: prefix (Ctrl-a or Ctrl-b) then k.
 # Show only window names plus Pi notification status in the chooser.

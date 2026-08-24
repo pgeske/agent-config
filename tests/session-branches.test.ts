@@ -585,6 +585,8 @@ test("a nested busy /branch --with-context starts immediately and excludes the a
 		sessionBranchesExtension(fakePi);
 		assert.deepEqual([...tools.keys()].sort(), ["branch", "merge_branch"]);
 		assert.deepEqual([...shortcuts.keys()].sort(), ["ctrl+n", "ctrl+shift+m", "ctrl+shift+n"]);
+		assert.equal(shortcuts.get("ctrl+n")?.description, "Start a parallel branch in a new tmux window");
+		assert.equal(shortcuts.get("ctrl+shift+n")?.description, "Start a parallel branch in the current tmux window");
 
 		const context = {
 			ui: {
@@ -627,7 +629,7 @@ test("a nested busy /branch --with-context starts immediately and excludes the a
 			`notifications: ${notifications.join(" | ")}`,
 		);
 
-		await shortcuts.get("ctrl+n")!.handler(context);
+		await shortcuts.get("ctrl+shift+n")!.handler(context);
 		assert.equal(splitCalls, 2);
 		assert.ok(notifications.some((message) => message.includes("Created dialog branch")));
 
