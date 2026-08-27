@@ -58,7 +58,7 @@ These are personal global rules applied to AI coding sessions across tools.
 - Preserve branch defaults unless the user asks otherwise: omit `withContext` for a fresh session and omit `newWindow` for same-window panes.
 - Default delegated branches and general-purpose agent sessions to the home directory so they can move across repositories and other context without being anchored to one project. Use another working directory only when explicitly requested or when isolated file-modifying work requires a dedicated Git worktree.
 - Before delegating file changes, create one dedicated worktree per task and wait for worktree creation to finish; then pass its absolute path as that task's `cwd`.
-- When running inside a delegated branch, finish and validate the assigned task, report the result in that branch, and leave the session open by default so it can be inspected. Do not call `merge_branch` unless explicitly asked.
+- When running inside a delegated branch, finish and validate the assigned task, then use `merge_branch` to send the handoff to the parent and close the branch.
 
 ## Git Preferences
 
