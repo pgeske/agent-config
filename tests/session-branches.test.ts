@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -38,6 +38,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { BranchNameDialog } from "../extensions/session-branches/branch-name-dialog.ts";
 import sessionBranchesExtension from "../extensions/session-branches/index.ts";
 import {
+	buildPiShellCommand,
 	detachPaneToWindow,
 	launchBranch,
 	listActiveChildBranches,
@@ -165,12 +166,55 @@ test("parseBranchCommandArgs rejects ambiguous and malformed input", () => {
 	assert.throws(() => parseBranchCommandArgs('--cwd ""'), /--cwd cannot be empty/);
 });
 
+test("parseBranchCommandArgs parses optional model and thinking overrides", () => {
+	assert.deepEqual(
+		parseBranchCommandArgs('--name "review" --model "anthropic/claude-sonnet" --thinking "high"'),
+		{
+			fresh: true,
+			newWindow: false,
+			help: false,
+			name: "review",
+			model: "anthropic/claude-sonnet",
+			thinkingLevel: "high",
+		},
+	);
+	assert.deepEqual(parseBranchCommandArgs('--model=local/llama --thinking=low "do a thing"'), {
+		fresh: true,
+		newWindow: false,
+		help: false,
+		model: "local/llama",
+		thinkingLevel: "low",
+		prompt: "do a thing",
+	});
+});
+
+test("parseBranchCommandArgs rejects empty model and thinking overrides", () => {
+	assert.throws(() => parseBranchCommandArgs('--model ""'), /--model cannot be empty/);
+	assert.throws(() => parseBranchCommandArgs('--thinking ""'), /--thinking cannot be empty/);
+});
+
 test("branch names are stable, bounded, and tmux-safe", () => {
 	assert.equal(defaultBranchName("auth rollout", "1234567890", 3), "auth rollout-branch-3");
 	assert.equal(normalizeBranchName("  OAuth\n  rollout  "), "OAuth rollout");
 	assert.equal(defaultBranchName(undefined, "1234567890", 1), "session-12345678-branch-1");
 	assert.ok(defaultBranchName("x".repeat(120), "id", 9).length <= 80);
 	assert.equal(slugifyBranchName("OAuth / Token Exchange!"), "oauth-token-exchange");
+});
+
+test("branch startup keeps prompts out of the tmux command and waits for metadata", () => {
+	const command = buildPiShellCommand({
+		cwd: "/repo with spaces",
+		sessionFile: "/tmp/branch.jsonl",
+		promptFile: "/tmp/branch prompt",
+		model: "provider/model",
+		thinkingLevel: "high",
+		launchChannel: "pi-branch-start-branch-session",
+	});
+	assert.match(command, /tmux wait-for 'pi-branch-start-branch-session'/);
+	assert.match(command, /branch_prompt=\$\(cat '\/tmp\/branch prompt'\)/);
+	assert.match(command, /rm -f '\/tmp\/branch prompt'/);
+	assert.match(command, /"\$branch_prompt"$/);
+	assert.ok(!command.includes("Branch task:"));
 });
 
 test("nested branch placement resets pane depth in new windows", () => {
@@ -471,7 +515,7 @@ test("legacy branch metadata remains compatible with a version-one parent runtim
 	}
 });
 
-test("a nested busy /branch --with-context starts immediately and excludes the active partial turn", async () => {
+test("a nested busy /branch --with-context starts from the latest settled response", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "session-branch-steer-test-"));
 	const runtimeDirectory = await mkdtemp("/tmp/sb-steer-");
 	const parentFile = join(directory, "parent.jsonl");
@@ -612,15 +656,24 @@ test("a nested busy /branch --with-context starts immediately and excludes the a
 
 		for (const handler of handlers.get("session_start") ?? []) await handler({}, context);
 		assert.equal(JSON.parse(await readFile(registryPathForSession("project-session"), "utf8")).pid, process.pid);
-		for (const handler of handlers.get("before_agent_start") ?? []) await handler({}, context);
-		sessionManager.appendMessage({ role: "user", content: "current request", timestamp: Date.now() });
-		const completedTurn = assistantEntry("completed-turn", "current-request", "completed current turn");
-		if (completedTurn.type !== "message" || completedTurn.message.role !== "assistant") {
+
+		// Complete one agent run so it becomes the branch checkpoint.
+		sessionManager.appendMessage({ role: "user", content: "settled request", timestamp: Date.now() });
+		const settledResponse = assistantEntry("settled-response", "settled-request", "settled response");
+		if (settledResponse.type !== "message" || settledResponse.message.role !== "assistant") {
 			throw new Error("Expected an assistant message entry");
 		}
-		sessionManager.appendMessage(completedTurn.message);
-		for (const handler of handlers.get("turn_end") ?? []) await handler({}, context);
+		sessionManager.appendMessage(settledResponse.message);
+		for (const handler of handlers.get("agent_settled") ?? []) await handler({}, context);
+
+		// An intermediate turn from the active run must not replace the settled checkpoint.
 		sessionManager.appendMessage({ role: "user", content: "active partial request", timestamp: Date.now() });
+		const intermediateTurn = assistantEntry("intermediate-turn", "active-request", "intermediate tool turn");
+		if (intermediateTurn.type !== "message" || intermediateTurn.message.role !== "assistant") {
+			throw new Error("Expected an assistant message entry");
+		}
+		sessionManager.appendMessage(intermediateTurn.message);
+		for (const handler of handlers.get("turn_end") ?? []) await handler({}, context);
 		idle = false;
 		await commands.get("branch")!.handler('--with-context --name "queued branch"', context);
 		assert.equal(splitCalls, 1);
@@ -660,10 +713,13 @@ test("a nested busy /branch --with-context starts immediately and excludes the a
 			SessionManager.open((dialogBranchEntry.data as { branchSessionFile: string }).branchSessionFile).getSessionName(),
 			"dialog branch",
 		);
-		const toolBranchSessions = createdEntries.slice(2).map((entry) => {
+		const toolBranchFiles = createdEntries.slice(2).map((entry) => {
 			if (entry.type !== "custom") throw new Error("Expected branch creation metadata");
-			return SessionManager.open((entry.data as { branchSessionFile: string }).branchSessionFile);
+			return (entry.data as { branchSessionFile: string }).branchSessionFile;
 		});
+		const toolBranchSessions = toolBranchFiles.map((file) => SessionManager.open(file));
+		assert.equal(await readFile(`${toolBranchFiles[0]}.prompt`, "utf8"), "Branch task:\nResearch x");
+		assert.equal((await stat(`${toolBranchFiles[0]}.prompt`)).mode & 0o777, 0o600);
 		assert.equal(toolBranchSessions[0].getHeader()?.cwd, worktreeDirectory);
 		for (const branchSession of toolBranchSessions) {
 			const metadata = findBranchMetadata(branchSession.getEntries())?.metadata;
@@ -693,13 +749,180 @@ test("a nested busy /branch --with-context starts immediately and excludes the a
 			});
 		assert.ok(branchTexts.some((text) => text.includes("completed request")));
 		assert.ok(branchTexts.some((text) => text.includes("completed response")));
-		assert.ok(branchTexts.some((text) => text.includes("current request")));
-		assert.ok(branchTexts.some((text) => text.includes("completed current turn")));
+		assert.ok(branchTexts.some((text) => text.includes("settled request")));
+		assert.ok(branchTexts.some((text) => text.includes("settled response")));
 		assert.ok(branchTexts.every((text) => !text.includes("active partial request")));
+		assert.ok(branchTexts.every((text) => !text.includes("intermediate tool turn")));
 
 		idle = true;
 		await commands.get("discard")!.handler("", context);
 		assert.ok(notifications.some((message) => message.includes("Close or merge child branches first")));
+
+		for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, context);
+	} finally {
+		if (previousRuntimeDirectory === undefined) delete process.env.PI_SESSION_BRANCH_RUNTIME_DIR;
+		else process.env.PI_SESSION_BRANCH_RUNTIME_DIR = previousRuntimeDirectory;
+		if (previousTmux === undefined) delete process.env.TMUX;
+		else process.env.TMUX = previousTmux;
+		if (previousTmuxPane === undefined) delete process.env.TMUX_PANE;
+		else process.env.TMUX_PANE = previousTmuxPane;
+		await rm(directory, { recursive: true, force: true });
+		await rm(runtimeDirectory, { recursive: true, force: true });
+	}
+});
+
+test("branch tool forwards model and thinking overrides and inherits them when omitted", async () => {
+	const directory = await mkdtemp(join(tmpdir(), "session-branch-override-test-"));
+	const runtimeDirectory = await mkdtemp("/tmp/sb-override-");
+	const parentFile = join(directory, "parent.jsonl");
+	const previousRuntimeDirectory = process.env.PI_SESSION_BRANCH_RUNTIME_DIR;
+	const previousTmux = process.env.TMUX;
+	const previousTmuxPane = process.env.TMUX_PANE;
+	process.env.PI_SESSION_BRANCH_RUNTIME_DIR = runtimeDirectory;
+	process.env.TMUX = "/tmp/test-tmux,1,0";
+	process.env.TMUX_PANE = "%1";
+
+	try {
+		const parentEntries = [
+			userEntry("parent-user", null, "completed request"),
+			assistantEntry("parent-leaf", "parent-user", "completed response"),
+		];
+		const project = buildBranchSession({
+			parentEntries,
+			parentSessionId: "main-session",
+			parentSessionFile: join(directory, "main.jsonl"),
+			cwd: directory,
+			forkEntryId: "parent-leaf",
+			branchSessionId: "project-session",
+			branchSessionFile: parentFile,
+			branchName: "project",
+			branchNumber: 1,
+			depth: 1,
+			windowDepth: 0,
+			windowRootSessionId: "project-session",
+			parentPaneId: "%0",
+			parentWindowId: "@0",
+			fresh: false,
+			launchMode: "window",
+			createdAt: "2026-07-31T12:00:00.000Z",
+			metadataEntryId: "project-metadata",
+			sessionInfoEntryId: "project-session-info",
+		});
+		await writeFile(parentFile, serializeSessionEntries(project.entries), { mode: 0o600 });
+		const sessionManager = SessionManager.open(parentFile);
+
+		const handlers = new Map<string, Array<(event: unknown, ctx: ExtensionContext) => unknown>>();
+		const tools = new Map<
+			string,
+			{
+				execute: (
+					toolCallId: string,
+					params: Record<string, unknown>,
+					signal: AbortSignal | undefined,
+					onUpdate: undefined,
+					ctx: ExtensionContext,
+				) => Promise<{ content: Array<{ type: string; text: string }>; details?: unknown }>;
+			}
+		>();
+		const shellCommands: string[] = [];
+
+		const fakePi = {
+			on(event: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) {
+				handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+			},
+			registerCommand() {},
+			registerTool(tool: {
+				name: string;
+				execute: (
+					toolCallId: string,
+					params: Record<string, unknown>,
+					signal: AbortSignal | undefined,
+					onUpdate: undefined,
+					ctx: ExtensionContext,
+				) => Promise<{ content: Array<{ type: string; text: string }>; details?: unknown }>;
+			}) {
+				tools.set(tool.name, tool);
+			},
+			registerShortcut() {},
+			exec: async (_command: string, args: string[]) => {
+				if (args[0] === "display-message") {
+					return { stdout: "$1\t@1\t%1\n", stderr: "", code: 0, killed: false };
+				}
+				if (args[0] === "list-panes") {
+					return { stdout: "%1\t0\t0\t\n", stderr: "", code: 0, killed: false };
+				}
+				if (args[0] === "split-window") {
+					shellCommands.push(args[args.length - 1]);
+					return { stdout: `%${shellCommands.length + 1}\n`, stderr: "", code: 0, killed: false };
+				}
+				return { stdout: "", stderr: "", code: 0, killed: false };
+			},
+			getThinkingLevel: () => "medium",
+			appendEntry: (customType: string, data: unknown) => sessionManager.appendCustomEntry(customType, data),
+		} as unknown as ExtensionAPI;
+		sessionBranchesExtension(fakePi);
+
+		const context = {
+			ui: { notify: () => undefined, custom: async () => "x" },
+			hasUI: true,
+			mode: "tui",
+			cwd: directory,
+			sessionManager,
+			modelRegistry: {},
+			model: { provider: "openai", id: "gpt-4o" },
+			isIdle: () => true,
+			signal: undefined,
+			abort: () => undefined,
+			hasPendingMessages: () => false,
+			shutdown: () => undefined,
+			getContextUsage: () => undefined,
+			compact: () => undefined,
+			getSystemPrompt: () => "",
+			waitForIdle: async () => undefined,
+		} as unknown as ExtensionCommandContext;
+
+		for (const handler of handlers.get("session_start") ?? []) await handler({}, context);
+
+		const branch = tools.get("branch")!;
+		await branch.execute(
+			"call",
+			{ tasks: [{ name: "model-only", prompt: "p", model: "anthropic/claude-sonnet" }] },
+			undefined,
+			undefined,
+			context,
+		);
+		await branch.execute(
+			"call",
+			{ tasks: [{ name: "thinking-only", prompt: "p", thinkingLevel: "high" }] },
+			undefined,
+			undefined,
+			context,
+		);
+		await branch.execute(
+			"call",
+			{ tasks: [{ name: "both", prompt: "p", model: "anthropic/claude-sonnet", thinkingLevel: "high" }] },
+			undefined,
+			undefined,
+			context,
+		);
+		await branch.execute(
+			"call",
+			{ tasks: [{ name: "inherit", prompt: "p" }] },
+			undefined,
+			undefined,
+			context,
+		);
+
+		assert.equal(shellCommands.length, 4);
+		// buildPiShellCommand shell-quotes every arg, including flags, so pairs appear as '--model' 'value'.
+		assert.match(shellCommands[0], /'--model' 'anthropic\/claude-sonnet'/);
+		assert.match(shellCommands[0], /'--thinking' 'medium'/);
+		assert.match(shellCommands[1], /'--model' 'openai\/gpt-4o'/);
+		assert.match(shellCommands[1], /'--thinking' 'high'/);
+		assert.match(shellCommands[2], /'--model' 'anthropic\/claude-sonnet'/);
+		assert.match(shellCommands[2], /'--thinking' 'high'/);
+		assert.match(shellCommands[3], /'--model' 'openai\/gpt-4o'/);
+		assert.match(shellCommands[3], /'--thinking' 'medium'/);
 
 		for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, context);
 	} finally {
@@ -821,6 +1044,14 @@ test("same-window launch stacks new managed branches above the current top branc
 	assert.ok(split);
 	assert.deepEqual(split.args.slice(0, 6), ["split-window", "-v", "-b", "-t", "%2", "-P"]);
 	assert.equal(calls.filter((call) => call.args[0] === "set-option").length, 7);
+	let metadataCall = -1;
+	for (const [index, call] of calls.entries()) {
+		if (call.args[0] === "set-option") metadataCall = index;
+	}
+	const releaseCall = calls.findIndex(
+		(call) => call.args[0] === "wait-for" && call.args[1] === "-S" && call.args[2] === "pi-branch-start-branch-session",
+	);
+	assert.ok(metadataCall >= 0 && releaseCall > metadataCall);
 
 	listOutput = "%1\t0\t0\t\n%9\t80\t0\tother-session\n";
 	await assert.rejects(

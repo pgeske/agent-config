@@ -18,6 +18,8 @@ export interface BranchCommandOptions {
 	name?: string;
 	prompt?: string;
 	cwd?: string;
+	model?: string;
+	thinkingLevel?: string;
 	help: boolean;
 }
 
@@ -211,6 +213,18 @@ export function parseBranchCommandArgs(input: string): BranchCommandOptions {
 			index = parsed.nextIndex;
 			continue;
 		}
+		if (token === "--model" || token.startsWith("--model=")) {
+			const parsed = optionValue(tokens, index, "--model");
+			options.model = parsed.value.trim();
+			index = parsed.nextIndex;
+			continue;
+		}
+		if (token === "--thinking" || token.startsWith("--thinking=")) {
+			const parsed = optionValue(tokens, index, "--thinking");
+			options.thinkingLevel = parsed.value.trim();
+			index = parsed.nextIndex;
+			continue;
+		}
 		if (token.startsWith("-")) throw new Error(`Unknown option: ${token}`);
 		positionalPrompt.push(token);
 	}
@@ -224,6 +238,10 @@ export function parseBranchCommandArgs(input: string): BranchCommandOptions {
 	if (options.name !== undefined && !options.name) throw new Error("--name cannot be empty");
 	if (options.prompt !== undefined && !options.prompt) throw new Error("--prompt cannot be empty");
 	if (options.cwd !== undefined && !options.cwd) throw new Error("--cwd cannot be empty");
+	if (options.model !== undefined && !options.model) throw new Error("--model cannot be empty");
+	if (options.thinkingLevel !== undefined && !options.thinkingLevel) {
+		throw new Error("--thinking cannot be empty");
+	}
 	return options;
 }
 

@@ -56,8 +56,9 @@ These are personal global rules applied to AI coding sessions across tools.
 - In Pi, when asked to delegate work to subagents, use the session-branches `branch` tool (the model-callable counterpart to `/branch`), not manual tmux commands. If that tool is unavailable, say so rather than emulating it.
 - For several independent tasks, pass all tasks in one `branch` call so it creates one named branch per task. Give every task a concise `name` and a self-contained `prompt`.
 - Preserve branch defaults unless the user asks otherwise: omit `withContext` for a fresh session and omit `newWindow` for same-window panes.
+- Default delegated branches and general-purpose agent sessions to the home directory so they can move across repositories and other context without being anchored to one project. Use another working directory only when explicitly requested or when isolated file-modifying work requires a dedicated Git worktree.
 - Before delegating file changes, create one dedicated worktree per task and wait for worktree creation to finish; then pass its absolute path as that task's `cwd`.
-- When running inside a delegated branch, finish and validate the assigned task, then use `merge_branch` to send the handoff to the parent and close the branch.
+- When running inside a delegated branch, finish and validate the assigned task, report the result in that branch, and leave the session open by default so it can be inspected. Do not call `merge_branch` unless explicitly asked.
 
 ## Git Preferences
 
@@ -66,6 +67,8 @@ These are personal global rules applied to AI coding sessions across tools.
 - Before pushing a branch or opening a pull request, fetch and base it on the latest default branch.
 - Sign commits and verify the commits being pushed with `git log --format='%h %G? %GS %s' <base>..HEAD`.
 - Use a separate signed commit for each coherent review-feedback batch instead of amending shared commits unless explicitly asked.
+- Prefer GitHub's native stacking support (`gh stack`) for stacked pull requests instead of representing the stack only through manually selected base branches, unless explicitly asked otherwise.
+- For non-trivial multi-file changes, include a `Review guide` section in the PR description listing changed files in review order, each with a one- or two-sentence ELI5 explanation of what changed and how it contributes to the fix.
 - Run the repository's lint command before opening a pull request or declaring a branch review-ready when one exists.
 - Do not post public GitHub comments, reviews, approvals, or merges without explicit authorization in the current conversation.
 - When public review feedback is authorized, prefer pending inline comments anchored to changed lines.
