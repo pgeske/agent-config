@@ -35,7 +35,7 @@ export interface LaunchBranchOptions {
 	windowDepth: number;
 	windowRootSessionId: string;
 	cwd: string;
-	prompt?: string;
+	promptFile?: string;
 	model?: string;
 	thinkingLevel?: string;
 	newWindow: boolean;
@@ -205,16 +205,20 @@ function currentPiInvocation(args: string[]): { command: string; args: string[] 
 export function buildPiShellCommand(options: {
 	cwd: string;
 	sessionFile: string;
-	prompt?: string;
+	promptFile?: string;
 	model?: string;
 	thinkingLevel?: string;
+	launchChannel: string;
 }): string {
 	const args = ["--session", options.sessionFile];
 	if (options.model) args.push("--model", options.model);
 	if (options.thinkingLevel) args.push("--thinking", options.thinkingLevel);
-	if (options.prompt) args.push(`Branch task:\n${options.prompt}`);
 	const invocation = currentPiInvocation(args);
-	return `cd ${shellQuote(options.cwd)} && exec ${[invocation.command, ...invocation.args].map(shellQuote).join(" ")}`;
+	const piCommand = [invocation.command, ...invocation.args].map(shellQuote).join(" ");
+	const promptCommand = options.promptFile
+		? `branch_prompt=$(cat ${shellQuote(options.promptFile)}) && rm -f ${shellQuote(options.promptFile)} && exec ${piCommand} "$branch_prompt"`
+		: `exec ${piCommand}`;
+	return `cd ${shellQuote(options.cwd)} && tmux wait-for ${shellQuote(options.launchChannel)} && ${promptCommand}`;
 }
 
 async function setPaneOptions(exec: ExecCommand, paneId: string, paneOptions: Array<[string, string]>): Promise<void> {
@@ -321,12 +325,14 @@ async function killPane(exec: ExecCommand, paneId: string): Promise<void> {
 }
 
 export async function launchBranch(options: LaunchBranchOptions): Promise<{ paneId: string; launchMode: "pane" | "window" }> {
+	const launchChannel = `pi-branch-start-${options.branchSessionId}`;
 	const shellCommand = buildPiShellCommand({
 		cwd: options.cwd,
 		sessionFile: options.branchSessionFile,
-		prompt: options.prompt,
+		promptFile: options.promptFile,
 		model: options.model,
 		thinkingLevel: options.thinkingLevel,
+		launchChannel,
 	});
 	let launchArgs: string[];
 	let launchMode: "pane" | "window";
@@ -379,6 +385,8 @@ export async function launchBranch(options: LaunchBranchOptions): Promise<{ pane
 
 	try {
 		await setPaneMetadata(options, paneId);
+		const released = await options.exec("tmux", ["wait-for", "-S", launchChannel], { timeout: TMUX_TIMEOUT_MS });
+		if (released.code !== 0) throw commandError(`Starting branch pane ${paneId}`, released);
 	} catch (error) {
 		await killPane(options.exec, paneId);
 		throw error;

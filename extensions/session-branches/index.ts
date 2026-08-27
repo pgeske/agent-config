@@ -54,10 +54,11 @@ import {
 } from "./tmux.ts";
 
 const BRANCH_HELP = [
-	"Usage: /branch [--with-context] [--new-window] [--name \"topic\"] [--cwd \"path\"] [--prompt \"task\"]",
+	"Usage: /branch [--with-context] [--new-window] [--name \"topic\"] [--cwd \"path\"] [--prompt \"task\"] [--model \"provider/model\"] [--thinking \"level\"]",
 	"Branches start fresh in the current working directory by default.",
 	"Omit --name to enter the session name in a centered dialog.",
 	"Use --with-context to inherit the parent conversation or --cwd to launch in another existing directory.",
+	"Use --model or --thinking to override the child Pi model or thinking level; omit them to inherit the parent's.",
 	"You can also provide the prompt as positional text after the options.",
 ].join("\n");
 
@@ -72,6 +73,16 @@ const BranchTaskSchema = Type.Object({
 	),
 	newWindow: Type.Optional(
 		Type.Boolean({ description: "Launch in a new tmux window. Default: false (same-window pane)." }),
+	),
+	model: Type.Optional(
+		Type.String({
+			description: "Override the child Pi model (e.g. \"provider/model\"). Omit to inherit the parent's model.",
+		}),
+	),
+	thinkingLevel: Type.Optional(
+		Type.String({
+			description: "Override the child Pi thinking level. Omit to inherit the parent's thinking level.",
+		}),
 	),
 });
 
@@ -252,6 +263,10 @@ function sessionFilePath(sessionDir: string, createdAt: string, sessionId: strin
 	return join(sessionDir, `${createdAt.replace(/[:.]/g, "-")}_${sessionId}.jsonl`);
 }
 
+function promptFilePath(sessionFile: string): string {
+	return `${sessionFile}.prompt`;
+}
+
 function captureBranchBase(ctx: ExtensionContext): BranchBase {
 	return {
 		sessionId: ctx.sessionManager.getSessionId(),
@@ -273,7 +288,7 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 	let activeContext: ExtensionContext | undefined;
 	let parentRuntime: ParentRuntime | undefined;
 	let tmuxContext: TmuxContext | undefined;
-	let latestCompletedTurnBase: BranchBase | undefined;
+	let latestSettledBase: BranchBase | undefined;
 	let effectiveBranchMetadata: BranchMetadata | undefined;
 
 	const exec: ExecCommand = (command, args, options) => pi.exec(command, args, options);
@@ -340,8 +355,12 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 
 		await mkdir(dirname(branchSessionFile), { recursive: true });
 		await writeFile(branchSessionFile, serializeSessionEntries(built.entries), { flag: "wx", mode: 0o600 });
+		const branchPromptFile = commandOptions.prompt ? promptFilePath(branchSessionFile) : undefined;
 		let launched;
 		try {
+			if (branchPromptFile) {
+				await writeFile(branchPromptFile, `Branch task:\n${commandOptions.prompt}`, { flag: "wx", mode: 0o600 });
+			}
 			launched = await launchBranch({
 				exec,
 				tmux: tmuxContext,
@@ -353,15 +372,16 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 				windowDepth: placement.windowDepth,
 				windowRootSessionId: placement.windowRootSessionId,
 				cwd: branchCwd,
-				prompt: commandOptions.prompt,
-				model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
-				thinkingLevel: pi.getThinkingLevel(),
+				promptFile: branchPromptFile,
+				model: commandOptions.model ?? (ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined),
+				thinkingLevel: commandOptions.thinkingLevel ?? pi.getThinkingLevel(),
 				newWindow: commandOptions.newWindow,
 				windowName: slugifyBranchName(branchName),
 				createdAt,
 			});
 		} catch (error) {
 			await removeBranchFile(branchSessionFile);
+			if (branchPromptFile) await removeBranchFile(branchPromptFile);
 			throw error;
 		}
 
@@ -400,7 +420,7 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 		activeContext = ctx;
 		parentRuntime = undefined;
 		tmuxContext = undefined;
-		latestCompletedTurnBase = captureBranchBase(ctx);
+		latestSettledBase = captureBranchBase(ctx);
 		effectiveBranchMetadata = undefined;
 
 		let branch;
@@ -510,7 +530,7 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 
 	pi.on("session_shutdown", async () => {
 		activeContext = undefined;
-		latestCompletedTurnBase = undefined;
+		latestSettledBase = undefined;
 		effectiveBranchMetadata = undefined;
 		const runtime = parentRuntime;
 		parentRuntime = undefined;
@@ -518,15 +538,10 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 		if (runtime) await runtime.stop();
 	});
 
-	// Capture only complete conversation boundaries. During an active turn, the
-	// latest persisted assistant message may contain tool calls whose results do
-	// not exist yet and cannot safely seed another model conversation.
-	pi.on("before_agent_start", (_event, ctx) => {
-		latestCompletedTurnBase = captureBranchBase(ctx);
-	});
-
-	pi.on("turn_end", (_event, ctx) => {
-		latestCompletedTurnBase = captureBranchBase(ctx);
+	// A settled agent run is the complete user request -> final response boundary.
+	// Ignore intermediate tool-loop turns so busy branches never start mid-run.
+	pi.on("agent_settled", (_event, ctx) => {
+		latestSettledBase = captureBranchBase(ctx);
 	});
 
 	pi.on("session_before_fork", (_event, ctx) => {
@@ -589,9 +604,9 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 				newWindow: commandOptions.newWindow,
 			});
 
-			const base = ctx.isIdle() ? captureBranchBase(ctx) : latestCompletedTurnBase;
+			const base = ctx.isIdle() ? captureBranchBase(ctx) : latestSettledBase;
 			if (!base || base.sessionId !== ctx.sessionManager.getSessionId()) {
-				throw new Error("Cannot identify the last completed turn for the active agent run");
+				throw new Error("Cannot identify the latest settled response for the active agent run");
 			}
 			await createBranch(ctx, commandOptions, base);
 		} catch (error) {
@@ -699,9 +714,9 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 			if (!ctx.hasUI) throw new Error("branch requires interactive Pi mode");
 			if (!parentRuntime || !tmuxContext) throw new Error("branch requires an active parent runtime inside tmux");
 
-			const base = ctx.isIdle() ? captureBranchBase(ctx) : latestCompletedTurnBase;
+			const base = ctx.isIdle() ? captureBranchBase(ctx) : latestSettledBase;
 			if (!base || base.sessionId !== ctx.sessionManager.getSessionId()) {
-				throw new Error("Cannot identify the last completed turn for the active agent run");
+				throw new Error("Cannot identify the latest settled response for the active agent run");
 			}
 
 			const launched = [];
@@ -711,6 +726,12 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 				const prompt = task.prompt.trim();
 				if (!name) throw new Error("Every branch task requires a non-empty name");
 				if (!prompt) throw new Error(`Branch ${name} requires a non-empty prompt`);
+				const model = task.model?.trim();
+				const thinkingLevel = task.thinkingLevel?.trim();
+				if (model !== undefined && !model) throw new Error(`Branch ${name} model cannot be empty`);
+				if (thinkingLevel !== undefined && !thinkingLevel) {
+					throw new Error(`Branch ${name} thinkingLevel cannot be empty`);
+				}
 				launched.push(
 					await createBranch(
 						ctx,
@@ -720,6 +741,8 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 							name,
 							prompt,
 							cwd: task.cwd,
+							model,
+							thinkingLevel,
 							help: false,
 						},
 						base,
@@ -770,7 +793,7 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 		getArgumentCompletions: (prefix) => {
 			const option = prefix.split(/\s+/).at(-1) ?? "";
 			if (!option.startsWith("-")) return null;
-			const values = ["--with-context", "--new-window", "--name", "--cwd", "--prompt", "--help"];
+			const values = ["--with-context", "--new-window", "--name", "--cwd", "--prompt", "--model", "--thinking", "--help"];
 			const matches = values.filter((value) => value.startsWith(option));
 			return matches.length > 0 ? matches.map((value) => ({ value, label: value })) : null;
 		},

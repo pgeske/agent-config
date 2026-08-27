@@ -53,6 +53,14 @@ test_install_all_creates_opencode_agents_symlink() (
   assert_symlink_target \
     "$home_dir/.pi/agent/skills/agent-browser" \
     "$ROOT_DIR/skills/agent-browser"
+
+  assert_symlink_target \
+    "$home_dir/.pi/agent/skills/sync-agent-config" \
+    "$ROOT_DIR/skills/sync-agent-config"
+
+  assert_symlink_target \
+    "$home_dir/.pi/agent/prompts/sync-agent-config.md" \
+    "$ROOT_DIR/commands/sync-agent-config.md"
 )
 
 test_named_gather_context_install_still_installs_agents() (
@@ -224,6 +232,12 @@ test_managed_files_do_not_reference_legacy_plugin() (
     "$ROOT_DIR/extensions"
 )
 
+test_sync_workflow_does_not_publish_work_identity() (
+  assert_no_matches 'pgeske''-dd|Data''dog|ddo''ghq' \
+    "$ROOT_DIR/commands/sync-agent-config.md" \
+    "$ROOT_DIR/skills/sync-agent-config"
+)
+
 test_existing_unmanaged_agents_file_requires_force() (
   local home_dir
   local output
@@ -282,6 +296,7 @@ main() {
   test_existing_unmanaged_agents_file_requires_force
   test_force_replaces_stale_target_root_symlink
   test_managed_files_do_not_reference_legacy_plugin
+  test_sync_workflow_does_not_publish_work_identity
   printf 'all installer checks passed\n'
 }
 
