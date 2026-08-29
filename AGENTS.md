@@ -78,9 +78,11 @@ These are personal global rules applied to AI coding sessions across tools.
 
 ## Personal Notes and Tasks
 
-- Use `notes-workflow` for raw captures, running notes, session recaps, and handoffs under `~/notes/raw/captures/`.
+- The Obsidian vault is device-specific: it is the directory containing `.obsidian`. On this Mac it is `~/Documents/notes`.
+- Wherever a skill or instruction says `~/notes`, substitute the vault root on this device (for example `~/notes/raw/captures/` becomes `<vault>/raw/captures/`).
+- Use `notes-workflow` for raw captures, running notes, session recaps, and handoffs under `<vault>/raw/captures/`.
 - Use `wiki-maintainer` only when asked to organize or ingest notes into the wiki.
-- Use `tasks-workflow` for persistent tasks in `~/notes/wiki/tasks.md`.
+- Use `tasks-workflow` for persistent tasks in `<vault>/wiki/tasks.md`.
 - Use `dailies` for morning planning and weekly-goal review.
 - In weekly goals, mark completed goals with strikethrough (`~~goal~~`), not checklist syntax or trailing checkmarks.
 - Treat persistent tasks as personal by default; add employer-specific work only when explicitly requested.

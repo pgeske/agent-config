@@ -7,8 +7,9 @@ description: Capture markdown notes into the user's raw notes area. Use when the
 
 ## Default location
 
-- Use `~/notes`.
-- Create notes under `~/notes/raw/captures/` unless the user asks for a different location.
+- The Obsidian vault is device-specific: it is the directory containing `.obsidian` (on the Mac, `~/Documents/notes`; on other setups, `~/notes`). Use whichever exists on this device.
+- Create notes under `<vault>/raw/captures/` unless the user asks for a different location.
+- Substitute `<vault>` everywhere a path below says `~/notes`.
 - Do not create user-facing notes in a temporary workspace unless the user explicitly asks for that.
 - Do not write directly into `wiki/` from this skill.
 
