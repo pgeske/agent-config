@@ -1,7 +1,16 @@
 #!/bin/sh
 set -eu
 
-checkout="${PI_EXPERIMENTAL_ROOT:-$HOME/.pi/experimental/pi-main-28657a2}"
+experimental_root="$HOME/.pi/experimental"
+checkout="${PI_EXPERIMENTAL_ROOT:-$(cat "$experimental_root/current" 2>/dev/null || true)}"
+if [ -z "$checkout" ]; then
+  echo "Experimental Pi pin not found. Run ~/agent-config/bootstrap.sh." >&2
+  exit 1
+fi
+case "$checkout" in
+  /*) ;;
+  *) checkout="$experimental_root/$checkout" ;;
+esac
 cli="$checkout/packages/coding-agent/dist/cli.js"
 
 if [ ! -f "$cli" ]; then

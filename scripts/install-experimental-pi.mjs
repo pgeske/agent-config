@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-const defaultCommit = "28657a2ffa6dbeccba74c166682e7a7ee547f5b4";
+const defaultCommit = "b79e4cc834970cca69daebffab7df1da7d1e52c4"; // v0.84.4
 const defaultRepository = "https://github.com/badlogic/pi-mono.git";
 
 function usage() {
@@ -117,7 +117,10 @@ async function install(options) {
 
   await run("npm", ["ci", "--ignore-scripts"], { ...options, cwd: options.checkout });
   await run("npm", ["run", "build"], { ...options, cwd: options.checkout });
-  if (!options.dryRun) await fs.writeFile(path.join(options.checkout, "BUILD_COMMIT"), `${options.commit}\n`);
+  if (!options.dryRun) {
+    await fs.writeFile(path.join(options.checkout, "BUILD_COMMIT"), `${options.commit}\n`);
+    await fs.writeFile(path.join(options.home, ".pi", "experimental", "current"), `${path.basename(options.checkout)}\n`);
+  }
   console.log(`Experimental Pi ${options.dryRun ? "would be built" : "built"} at ${options.checkout}`);
 }
 
