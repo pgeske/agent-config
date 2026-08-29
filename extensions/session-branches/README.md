@@ -35,7 +35,7 @@ The command refuses to move a branch that has live children. It also fails when 
 
 Available only in a branch. It summarizes conversation entries created after the explicit fork marker, injects the handoff into the active parent as a native Pi custom message, and closes the branch after the parent acknowledges it.
 
-The parent must still be running on the same Pi session and must be idle. A branch with live children cannot merge until those children are merged or discarded. If the parent used `/tree` after the fork, the summary is appended to its current active path and the parent receives a warning. If summarization or delivery fails, the branch stays open.
+The parent must still be running on the same Pi session. If the parent is mid-run, the merge summary is queued as a steering message and delivered at the next message boundary of the active run. A branch with live children cannot merge until those children are merged or discarded. If the parent used `/tree` after the fork, the summary is appended to its current active path and the parent receives a warning. If summarization or delivery fails, the branch stays open.
 
 ### `/discard`
 

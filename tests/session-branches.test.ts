@@ -12,6 +12,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import {
 	BRANCH_METADATA_TYPE,
+	BRANCH_MERGE_MESSAGE_TYPE,
 	buildBranchSession,
 	childBranchPlacement,
 	defaultBranchName,
@@ -512,6 +513,138 @@ test("legacy branch metadata remains compatible with a version-one parent runtim
 		if (previousRuntimeDir === undefined) delete process.env.PI_SESSION_BRANCH_RUNTIME_DIR;
 		else process.env.PI_SESSION_BRANCH_RUNTIME_DIR = previousRuntimeDir;
 		await rm(runtimeDir, { recursive: true, force: true });
+	}
+});
+
+test("a merge into a mid-run parent is accepted and steered into the active run", async () => {
+	const directory = await mkdtemp(join(tmpdir(), "session-branch-busy-merge-"));
+	const runtimeDirectory = await mkdtemp("/tmp/sb-busy-merge-");
+	const parentFile = join(directory, "main.jsonl");
+	const previousRuntimeDirectory = process.env.PI_SESSION_BRANCH_RUNTIME_DIR;
+	const previousTmux = process.env.TMUX;
+	const previousTmuxPane = process.env.TMUX_PANE;
+	process.env.PI_SESSION_BRANCH_RUNTIME_DIR = runtimeDirectory;
+	process.env.TMUX = "/tmp/test-tmux,1,0";
+	process.env.TMUX_PANE = "%1";
+
+	try {
+		const parentEntries = [
+			userEntry("parent-user", null, "completed request"),
+			assistantEntry("parent-leaf", "parent-user", "completed response"),
+		];
+		const branchSession = buildBranchSession({
+			parentEntries,
+			parentSessionId: "main-session",
+			parentSessionFile: join(directory, "main.jsonl"),
+			cwd: directory,
+			forkEntryId: "parent-leaf",
+			branchSessionId: "busy-branch-session",
+			branchSessionFile: parentFile,
+			branchName: "busy-branch",
+			branchNumber: 1,
+			depth: 1,
+			windowDepth: 0,
+			windowRootSessionId: "busy-branch-session",
+			parentPaneId: "%0",
+			parentWindowId: "@0",
+			fresh: false,
+			launchMode: "window",
+			createdAt: "2026-07-31T12:00:00.000Z",
+			metadataEntryId: "busy-branch-metadata",
+			sessionInfoEntryId: "busy-branch-session-info",
+		});
+		await writeFile(parentFile, serializeSessionEntries(branchSession.entries), { mode: 0o600 });
+		const sessionManager = SessionManager.open(parentFile);
+		const handlers = new Map<string, Array<(event: unknown, ctx: ExtensionContext) => unknown>>();
+		const sentMessages: Array<{ customType: string; details: unknown }> = [];
+		const fakePi = {
+			on(event: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) {
+				handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+			},
+			registerCommand() {},
+			registerTool() {},
+			registerShortcut() {},
+			sendMessage(message: { customType: string; details: unknown }) {
+				sentMessages.push(message);
+			},
+			exec: async (_command: string, args: string[]) => {
+				if (args[0] === "display-message") {
+					return { stdout: "$1\t@1\t%1\n", stderr: "", code: 0, killed: false };
+				}
+				return { stdout: "", stderr: "", code: 0, killed: false };
+			},
+			getThinkingLevel: () => "medium",
+			appendEntry: (customType: string, data: unknown) => sessionManager.appendCustomEntry(customType, data),
+		} as unknown as ExtensionAPI;
+		sessionBranchesExtension(fakePi);
+
+		// Simulate a parent that is streaming an agent run while the merge arrives.
+		const context = {
+			ui: { notify: () => undefined },
+			hasUI: true,
+			mode: "tui",
+			cwd: directory,
+			sessionManager,
+			modelRegistry: {},
+			model: undefined,
+			isIdle: () => false,
+			signal: undefined,
+			abort: () => undefined,
+			hasPendingMessages: () => false,
+			shutdown: () => undefined,
+			getContextUsage: () => undefined,
+			compact: () => undefined,
+			getSystemPrompt: () => "",
+			waitForIdle: async () => undefined,
+		} as unknown as ExtensionCommandContext;
+
+		for (const handler of handlers.get("session_start") ?? []) await handler({}, context);
+		assert.equal(JSON.parse(await readFile(registryPathForSession("busy-branch-session"), "utf8")).pid, process.pid);
+
+		const metadata = metadataFixture({
+			depth: 1,
+			windowDepth: 0,
+			windowRootSessionId: "busy-leaf-session",
+			fresh: false,
+			branchSessionId: "busy-leaf-session",
+			branchSessionFile: join(directory, "busy-leaf.jsonl"),
+			branchName: "busy-leaf",
+			branchNumber: 1,
+			parentSessionId: "busy-branch-session",
+			parentSessionFile: parentFile,
+			forkEntryId: "parent-leaf",
+		});
+		const details: BranchMergeDetails = {
+			version: 2,
+			depth: metadata.depth,
+			windowDepth: metadata.windowDepth,
+			branchSessionId: metadata.branchSessionId,
+			branchSessionFile: metadata.branchSessionFile,
+			branchName: metadata.branchName,
+			branchNumber: 1,
+			forkEntryId: metadata.forkEntryId,
+			fresh: false,
+			mergedAt: "2026-07-31T13:00:00.000Z",
+			readFiles: [],
+			modifiedFiles: [],
+		};
+		await requestParentMerge(metadata, { metadata, summary: "done while parent streams", details });
+
+		assert.equal(sentMessages.length, 1);
+		assert.equal(sentMessages[0]?.customType, BRANCH_MERGE_MESSAGE_TYPE);
+		assert.equal((sentMessages[0]?.details as BranchMergeDetails).branchSessionId, "busy-leaf-session");
+
+		for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, context);
+		await assert.rejects(readFile(registryPathForSession("busy-branch-session"), "utf8"), /ENOENT/);
+	} finally {
+		if (previousRuntimeDirectory === undefined) delete process.env.PI_SESSION_BRANCH_RUNTIME_DIR;
+		else process.env.PI_SESSION_BRANCH_RUNTIME_DIR = previousRuntimeDirectory;
+		if (previousTmux === undefined) delete process.env.TMUX;
+		else process.env.TMUX = previousTmux;
+		if (previousTmuxPane === undefined) delete process.env.TMUX_PANE;
+		else process.env.TMUX_PANE = previousTmuxPane;
+		await rm(runtimeDirectory, { recursive: true, force: true });
+		await rm(directory, { recursive: true, force: true });
 	}
 });
 

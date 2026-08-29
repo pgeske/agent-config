@@ -192,48 +192,13 @@ async function summarizeBranch(
 }
 
 const PARENT_BUSY_PATTERN = "busy";
-const PARENT_POLL_INTERVAL_MS = 3_000;
-const PARENT_POLL_TIMEOUT_MS = 5 * 60_000;
 const MERGE_RETRY_INTERVAL_MS = 2_000;
 const MERGE_MAX_RETRIES = 3;
 
-type ParentReadyResult = "ready" | "aborted" | { error: string };
-
-// waitForParentReady polls the parent session until it is idle, showing a loader
-// the user can abort. The parent only persists merge messages when idle, so we
-// cannot inject while it is streaming.
-async function waitForParentReady(
-	ctx: ExtensionContext,
-	metadata: BranchMetadata,
-): Promise<ParentReadyResult> {
-	return ctx.ui.custom<ParentReadyResult>((tui, theme, _keybindings, done) => {
-		const loader = new BorderedLoader(tui, theme, "Waiting for parent session to become idle...");
-		let cancelled = false;
-		loader.onAbort = () => {
-			cancelled = true;
-			done("aborted");
-		};
-		void (async () => {
-			const deadline = Date.now() + PARENT_POLL_TIMEOUT_MS;
-			while (!cancelled && Date.now() < deadline) {
-				try {
-					await checkParentReady(metadata);
-					done("ready");
-					return;
-				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error);
-					if (!message.includes(PARENT_BUSY_PATTERN)) {
-						done({ error: message });
-						return;
-					}
-					await new Promise((r) => setTimeout(r, PARENT_POLL_INTERVAL_MS));
-				}
-			}
-			if (!cancelled) done({ error: "Timed out waiting for the parent session to become idle" });
-		})();
-		return loader;
-	});
-}
+// Merge delivery does not wait for the parent to become idle: pi steers custom
+// messages into a busy run and persists them at the next message boundary.
+// The busy-pattern retry still tolerates an older parent process that rejects
+// merges while it is streaming.
 
 // requestParentMergeWithRetry retries the merge delivery a few times in case the
 // parent starts a new turn between the readiness check and the merge request.
@@ -463,7 +428,6 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 			): { context: ExtensionContext; metadata: BranchMetadata; parentMoved: boolean } => {
 				const current = activeContext;
 				if (!current) throw new Error("The parent Pi session is shutting down");
-				if (!current.isIdle()) throw new Error("The parent Pi session is busy; retry /merge when it is idle");
 				const metadata = normalizeBranchMetadata(value);
 				if (
 					!metadata ||
@@ -625,14 +589,13 @@ export default function sessionBranchesExtension(pi: ExtensionAPI) {
 			await assertNoActiveChildren(ctx);
 			const branchEntries = entriesAfterBranchPoint(ctx.sessionManager.getBranch(), branch.entryId);
 			if (!hasMergeableContent(branchEntries)) throw new Error("This branch has no conversation to merge");
-			const parentReady = await waitForParentReady(ctx, branch.metadata);
-			if (parentReady !== "ready") {
-				if (parentReady === "aborted") {
-					ctx.ui.notify("Branch merge cancelled", "info");
-				} else {
-					throw new Error(parentReady.error);
-				}
-				return false;
+			// Fail fast when the parent is gone or mismatched, but don't wait for it
+			// to become idle: the parent queues the merge message while it streams.
+			try {
+				await checkParentReady(branch.metadata);
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				if (!message.includes(PARENT_BUSY_PATTERN)) throw new Error(message);
 			}
 
 			const summaryResult = await summarizeBranch(branchEntries, ctx);
