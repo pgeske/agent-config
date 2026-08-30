@@ -182,7 +182,8 @@ clear_window_options() {
 
 aggregate_window_notification() {
   local target="$1"
-  local pane state label id set_at
+  local prefer_id="${2:-}"
+  local pane state label id set_at take
   local best_state=""
   local best_label=""
   local best_id=""
@@ -191,10 +192,13 @@ aggregate_window_notification() {
   while IFS= read -r pane; do
     [ -n "$pane" ] || continue
     state="$(pane_option "$pane" @pi_notify_state)"
+    # Eligibility is state-based: also requiring a non-empty id would hide a
+    # pane whose options were only partially written or read during a tmux
+    # hiccup, letting a stale done marker win over a live running pane.
+    [ -n "$state" ] || continue
     label="$(pane_option "$pane" @pi_notify_label)"
     id="$(pane_option "$pane" @pi_notify_id)"
     set_at="$(pane_option "$pane" @pi_notify_set_at)"
-    [ -n "$id" ] || continue
     set_at="${set_at:-0}"
 
     if [ "$state" = "running" ]; then
@@ -206,17 +210,29 @@ aggregate_window_notification() {
         best_id="$id"
         best_set_at="$set_at"
       fi
-    elif [ "$state" = "done" ] && [ "$best_state" != "running" ] && [ "$set_at" -ge "$best_set_at" ]; then
-      best_state="$state"
-      best_label="$label"
-      best_id="$id"
-      best_set_at="$set_at"
+    elif [ "$state" = "done" ] && [ "$best_state" != "running" ]; then
+      take=0
+      if [ -z "$best_id" ]; then
+        take=1
+      elif [ "$set_at" -gt "$best_set_at" ]; then
+        take=1
+      elif [ "$set_at" = "$best_set_at" ] && { [ "$id" = "$prefer_id" ] || [ -z "$prefer_id" ]; }; then
+        # Same-second tie: the caller's just-completed pane becomes the visible
+        # marker; without a preference the last pane read wins.
+        take=1
+      fi
+      if [ "$take" = "1" ]; then
+        best_state="$state"
+        best_label="$label"
+        best_id="$id"
+        best_set_at="$set_at"
+      fi
     fi
   done <<EOF_PANES
 $(tmux list-panes -t "$target" -F '#{pane_id}' 2>/dev/null || true)
 EOF_PANES
 
-  if [ -n "$best_id" ]; then
+  if [ -n "$best_state" ]; then
     set_window_option "$target" @pi_notify_state "$best_state"
     set_window_option "$target" @pi_notify_label "$best_label"
     set_window_option "$target" @pi_notify_id "$best_id"
@@ -232,12 +248,18 @@ clear_notification() {
 
   while IFS= read -r pane; do
     [ -n "$pane" ] || continue
-    clear_pane_notification "$pane"
+    # Clearing dismisses notifications; a running pane's marker is live agent
+    # state, not a dismissible notification.
+    if [ "$(pane_option "$pane" @pi_notify_state)" != "running" ]; then
+      clear_pane_notification "$pane"
+    fi
   done <<EOF_PANES
 $(tmux list-panes -t "$target" -F '#{pane_id}' 2>/dev/null || true)
 EOF_PANES
 
-  clear_window_options "$target"
+  # Re-aggregate instead of blindly clearing the window: with a running pane
+  # the marker must survive, and with none left the aggregate clears it.
+  aggregate_window_notification "$target"
 }
 
 clear_matching_notification() {
@@ -250,8 +272,13 @@ clear_matching_notification() {
     [ -n "$pane" ] || continue
     id="$(pane_option "$pane" @pi_notify_id)"
     if [ -n "$expected_id" ] && [ "$id" = "$expected_id" ]; then
-      clear_pane_notification "$pane"
-      cleared=1
+      # State is written before id by set_notification, so reading it after the
+      # id sees the newest truth: a pane that moved on to running is live agent
+      # state, and a stale timer must never erase it.
+      if [ "$(pane_option "$pane" @pi_notify_state)" != "running" ]; then
+        clear_pane_notification "$pane"
+        cleared=1
+      fi
     fi
   done <<EOF_PANES
 $(tmux list-panes -t "$target" -F '#{pane_id}' 2>/dev/null || true)
@@ -317,11 +344,22 @@ set_notification() {
   set_pane_option "$pane" @pi_notify_id "$id"
   set_pane_option "$pane" @pi_notify_set_at "$set_at"
 
-  aggregate_window_notification "$target"
+  aggregate_window_notification "$target" "$id"
 
-  # A newly completed pane should become the visible done marker once no panes
-  # are still running, even when another pane completed in the same second.
-  if [ "$state" = "done" ] && [ "$(window_option "$target" @pi_notify_state)" != "running" ]; then
+  # Second pass: a concurrent pane write (another pane's set) that landed
+  # between the first pass's reads must not leave a stale winner published.
+  sleep 0.05
+  aggregate_window_notification "$target" "$id"
+
+  # The same-second done tie-break is handled by prefer_id above. It must stay
+  # part of the aggregate: a post-aggregate done override reads the window and
+  # then blindly rewrites it, so a concurrent writer (or a transient empty
+  # read) between the two steps publishes stale done over a live running pane.
+  # Running is the invariant the tab must always reflect, so if even two
+  # aggregates failed to publish running while this pane is running, force it:
+  # this pane's options were just written successfully, making running the
+  # freshest truth available.
+  if [ "$state" = "running" ] && [ "$(window_option "$target" @pi_notify_state)" != "running" ]; then
     set_window_option "$target" @pi_notify_state "$state"
     set_window_option "$target" @pi_notify_label "$label"
     set_window_option "$target" @pi_notify_id "$id"
@@ -335,9 +373,13 @@ set_notification() {
 
 mark_viewed() {
   local target="${1:-$(selected_window_id)}"
-  local state id
-  state="$(window_option "$target" @pi_notify_state)"
-  id="$(window_option "$target" @pi_notify_id)"
+  # Read state and id in a single tmux call: two separate reads can straddle a
+  # concurrent aggregate and let a fresh running id slip past the done-state
+  # guard, which would schedule a clear that wipes a live running pane.
+  local snapshot state id
+  snapshot="$(tmux display-message -p -t "$target" '#{@pi_notify_state}|#{@pi_notify_id}' 2>/dev/null || true)"
+  state="${snapshot%%|*}"
+  id="${snapshot#*|}"
 
   [ -n "$id" ] || exit 0
   [ "$state" != "running" ] || exit 0

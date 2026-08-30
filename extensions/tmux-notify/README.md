@@ -11,8 +11,8 @@ Only two automatic states are currently supported: running/loading and done. Age
 
 Clearing policy lives in the `tmux-pi-notify` helper:
 
-- `🔄` stays visible while any Pi pane in the tmux window is running
+- `🔄` stays visible while any Pi pane in the tmux window is running, even if a concurrent update or a stale timer would hide it
 - `✅` clears after `PI_TMUX_NOTIFY_DONE_TTL_SECONDS` (default `8`) if the window is visible then
 - `✅` on inactive windows persists until that window is selected
 - after a window is selected, `✅` clears after `PI_TMUX_NOTIFY_VIEWED_TTL_SECONDS` (default `4`)
-- delayed clears are id-checked so old timers cannot clear newer notifications
+- delayed clears are id-checked so old timers cannot clear newer notifications, and they never erase a pane that has started running again
