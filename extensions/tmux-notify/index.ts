@@ -15,13 +15,21 @@ function inTmux(): boolean {
 	return Boolean(process.env.TMUX);
 }
 
-function runTmuxNotify(args: string[]): Promise<void> {
+function runTmuxNotify(args: string[], attempt = 0): Promise<void> {
 	if (!inTmux()) return Promise.resolve();
 
 	return new Promise((resolve) => {
-		execFile(scriptPath, args, { timeout: 10_000 }, () => {
+		execFile(scriptPath, args, { timeout: 10_000 }, (error) => {
 			// Notifications should never interrupt the agent. If tmux is unavailable,
 			// the script is missing, or a session was detached, fail closed/no-op.
+			// A nonzero exit is usually a transient tmux hiccup mid-write; retry once
+			// so pane state and the window aggregate do not drift apart.
+			if (error && attempt < 1) {
+				setTimeout(() => {
+					runTmuxNotify(args, attempt + 1).then(resolve);
+				}, 250);
+				return;
+			}
 			resolve();
 		});
 	});
