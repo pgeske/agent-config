@@ -1,6 +1,6 @@
 ---
 name: dailies
-description: Runs a daily planning workflow against ~/notes/wiki/tasks.md by checking recurring morning tasks, reviewing carry-over work, and updating today, this week, backlog, and done.
+description: Runs a daily planning workflow against ~/notes/wiki/tasks.md by checking recurring morning tasks, triaging open personal pull requests, reviewing carry-over work, and updating today, this week, backlog, and done.
 ---
 
 # Dailies
@@ -9,11 +9,12 @@ description: Runs a daily planning workflow against ~/notes/wiki/tasks.md by che
 
 Use this skill to run a short daily planning session around `~/notes/wiki/tasks.md`.
 
-The flow has three parts:
+The flow has four parts:
 
 1. A recurring daily check-in for the same startup tasks.
-2. A high-level weekly goals pass that captures what the week is broadly about in human-readable prose or bullets.
-3. A checklist planning pass that turns the weekly goals and existing tasks into concrete `today` and `this week` todos, then rewrites the task file cleanly.
+2. A pull-request triage pass that surfaces personal PRs ready to merge, waiting on review, or blocked.
+3. A high-level weekly goals pass that captures what the week is broadly about in human-readable prose or bullets.
+4. A checklist planning pass that turns the weekly goals and existing tasks into concrete `today` and `this week` todos, then rewrites the task file cleanly.
 
 This skill is designed for the user's current Obsidian-style task file with these sections:
 
@@ -135,7 +136,33 @@ Example shape:
 
 Do not dump the whole file back unless the user asks.
 
-### 3. Weekly Goals Interview
+### 3. PR Triage
+
+Before weekly planning, review open pull requests authored by the user's personal GitHub account and sort them into three buckets:
+
+1. **Ready to merge**: approved, required checks passing, no outstanding review requests, and genuinely mergeable.
+2. **Waiting on review**: review is still required, a requested reviewer has not approved, or the PR has gone stale since its last push. Offer to draft a reviewer nudge rather than sending one.
+3. **Blocked**: merge conflicts or failing/stuck required checks. Name the blocker; turn a needed code fix into a task rather than fixing it inline during dailies.
+
+Re-check each PR's current state before assigning a bucket. Do not infer that a PR merged from old planning notes or a previously green gate. For candidate merge-ready PRs, inspect at least `state`, `mergedAt`, `reviewDecision`, `mergeStateStatus`, `reviewRequests`, and required checks.
+
+Keep triage read-only by default: do not merge, close, re-request review, retry jobs, or post comments unless explicitly asked in the current conversation.
+
+Use the personal `pgeske` GitHub identity and verify it before querying. `gh search prs` is useful for discovering repositories but does not expose all review-state fields, so follow discovery with per-PR inspection:
+
+```bash
+gh auth switch --hostname github.com --user pgeske
+gh api user --jq .login
+gh search prs --author @me --state open --limit 100 --json repository,number,title,url
+# For every result:
+gh pr view <number> --repo <owner/repo> \
+  --json state,mergedAt,reviewDecision,mergeable,mergeStateStatus,reviewRequests
+gh pr checks <number> --repo <owner/repo>
+```
+
+Always pass `--repo` to `gh pr view` and `gh pr checks` when running outside a repository checkout.
+
+### 4. Weekly Goals Interview
 
 After the context summary, start by working backwards from the week-level picture.
 
@@ -150,7 +177,7 @@ Before moving on, briefly reflect the proposed weekly goals and ask whether that
 
 Also update the `## weekly goal` section at the top of `~/notes/wiki/tasks.md` with the same current-week goals. If `tasks.md` does not have that section yet, add it before `## today`.
 
-### 4. Checklist Planning Interview
+### 5. Checklist Planning Interview
 
 After weekly goals are settled, guide the user into concrete tasks.
 
@@ -181,7 +208,7 @@ If needed, ask short follow-ups to clarify:
 
 Be collaborative and concise. The point is to help the user decide, not to over-structure the conversation.
 
-### 5. Update The Task File
+### 6. Update The Task File
 
 When the planning conversation is complete, update `~/notes/wiki/tasks.md`.
 
@@ -208,7 +235,7 @@ Apply these rules:
 
 If checked tasks are still sitting in `today`, `this week`, or `backlog`, move them into `done` during the rewrite.
 
-### 5a. Tags
+### 6a. Tags
 
 Add tags when they help capture stable themes, projects, or workstreams.
 
@@ -233,7 +260,7 @@ Rules:
 - Reuse existing tags when they fit.
 - Do not create extra tags if none are clearly helpful.
 
-### 6. Confirm The Result
+### 7. Confirm The Result
 
 After editing, summarize:
 
@@ -278,9 +305,10 @@ When converting an existing plain task with no metadata into the new format:
 3. Ask `Did you check your calendar?`
 4. Read `~/notes/wiki/tasks.md` and `~/notes/wiki/weekly-goals.md`
 5. Summarize current weekly goals, carry-over, and existing weekly commitments
-6. Ask what the user wants this week to be about
-7. Draft and save the current week's high-level goals in `weekly-goals.md`
-8. Ask what concrete tasks should go into `today`, `this week`, and `backlog`
-9. Clarify any moves, rewrites, or completed items
-10. Rewrite `tasks.md`
-11. Briefly summarize the saved weekly goals and final task organization
+6. Triage open personal pull requests into ready to merge, waiting on review, and blocked
+7. Ask what the user wants this week to be about
+8. Draft and save the current week's high-level goals in `weekly-goals.md`
+9. Ask what concrete tasks should go into `today`, `this week`, and `backlog`
+10. Clarify any moves, rewrites, or completed items
+11. Rewrite `tasks.md`
+12. Briefly summarize the saved weekly goals and final task organization
