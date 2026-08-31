@@ -4,12 +4,15 @@ import { dirname, join, resolve } from "node:path";
 import {
 	BorderedLoader,
 	generateBranchSummary,
+	getMarkdownTheme,
+	keyHint,
 	type BranchSummaryResult,
 	type ExtensionAPI,
 	type ExtensionCommandContext,
 	type ExtensionContext,
 	type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
+import { Box, Markdown, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { BranchNameDialog } from "./branch-name-dialog.ts";
 import {
@@ -250,6 +253,38 @@ async function removeBranchFile(path: string): Promise<void> {
 }
 
 export default function sessionBranchesExtension(pi: ExtensionAPI) {
+	pi.registerMessageRenderer(BRANCH_MERGE_MESSAGE_TYPE, (message, { expanded, outputPad }, theme) => {
+		const content =
+			typeof message.content === "string"
+				? message.content
+				: message.content
+					.filter((block) => block.type === "text")
+					.map((block) => block.text)
+					.join("\n");
+		const headline = content.split("\n", 1)[0]?.trim() || "Parallel branch merged into this session.";
+		const box = new Box(outputPad, 1, (text) => theme.bg("customMessageBg", text));
+
+		if (expanded) {
+			box.addChild(
+				new Markdown(content, 0, 0, getMarkdownTheme(), {
+					color: (text: string) => theme.fg("customMessageText", text),
+				}),
+			);
+		} else {
+			box.addChild(
+				new Text(
+					theme.fg("customMessageText", `${headline} (`) +
+						theme.fg("dim", keyHint("app.tools.expand", "to expand")) +
+						theme.fg("customMessageText", ")"),
+					0,
+					0,
+				),
+			);
+		}
+
+		return box;
+	});
+
 	let activeContext: ExtensionContext | undefined;
 	let parentRuntime: ParentRuntime | undefined;
 	let tmuxContext: TmuxContext | undefined;

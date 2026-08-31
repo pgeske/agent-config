@@ -4,11 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
+	initTheme,
 	SessionManager,
 	type ExtensionAPI,
 	type ExtensionCommandContext,
 	type ExtensionContext,
+	type MessageRenderer,
 	type SessionEntry,
+	type Theme,
 } from "@earendil-works/pi-coding-agent";
 import {
 	BRANCH_METADATA_TYPE,
@@ -104,6 +107,51 @@ function metadataFixture(overrides: Partial<BranchMetadata> = {}): BranchMetadat
 		...overrides,
 	} as BranchMetadata;
 }
+
+test("branch merge messages collapse to a headline and expand to the full summary", () => {
+	let renderer: MessageRenderer | undefined;
+	const fakePi = {
+		on() {},
+		registerCommand() {},
+		registerTool() {},
+		registerShortcut() {},
+		registerMessageRenderer(customType: string, candidate: MessageRenderer) {
+			assert.equal(customType, BRANCH_MERGE_MESSAGE_TYPE);
+			renderer = candidate;
+		},
+	} as unknown as ExtensionAPI;
+	initTheme("dark");
+	sessionBranchesExtension(fakePi);
+	assert.ok(renderer);
+
+	const content = mergeMessageContent("review", "## Outcome\nDone without dropping the handoff.");
+	const message = {
+		role: "custom",
+		customType: BRANCH_MERGE_MESSAGE_TYPE,
+		content,
+		display: true,
+		details: metadataFixture({ branchName: "review" }),
+		timestamp: Date.now(),
+	};
+	const theme = {
+		fg: (_color: string, text: string) => text,
+		bg: (_color: string, text: string) => text,
+	} as Theme;
+
+	const collapsed = renderer(message as never, { expanded: false, outputPad: 0 }, theme)
+		?.render(120)
+		.join("\n");
+	assert.match(collapsed ?? "", /Parallel branch "review" merged into this session/);
+	assert.match(collapsed ?? "", /to expand/);
+	assert.doesNotMatch(collapsed ?? "", /Done without dropping the handoff/);
+
+	const expanded = renderer(message as never, { expanded: true, outputPad: 0 }, theme)
+		?.render(120)
+		.join("\n");
+	assert.match(expanded ?? "", /Parallel branch "review" merged into this session/);
+	assert.match(expanded ?? "", /Outcome/);
+	assert.match(expanded ?? "", /Done without dropping the handoff/);
+});
 
 test("branch name dialog submits a trimmed name and cancels with escape", () => {
 	const completed: Array<string | undefined> = [];
@@ -564,6 +612,7 @@ test("a merge into a mid-run parent is accepted and steered into the active run"
 			registerCommand() {},
 			registerTool() {},
 			registerShortcut() {},
+			registerMessageRenderer() {},
 			sendMessage(message: { customType: string; details: unknown }) {
 				sentMessages.push(message);
 			},
@@ -726,6 +775,7 @@ test("a nested busy /branch --with-context starts from the latest settled respon
 			registerShortcut(shortcut: string, options: { description?: string; handler: (ctx: ExtensionContext) => Promise<void> | void }) {
 				shortcuts.set(shortcut, options);
 			},
+			registerMessageRenderer() {},
 			exec: async (_command: string, args: string[]) => {
 				if (args[0] === "display-message") {
 					return { stdout: "$1\t@1\t%1\n", stderr: "", code: 0, killed: false };
@@ -977,6 +1027,7 @@ test("branch tool forwards model and thinking overrides and inherits them when o
 				tools.set(tool.name, tool);
 			},
 			registerShortcut() {},
+			registerMessageRenderer() {},
 			exec: async (_command: string, args: string[]) => {
 				if (args[0] === "display-message") {
 					return { stdout: "$1\t@1\t%1\n", stderr: "", code: 0, killed: false };

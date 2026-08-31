@@ -18,6 +18,9 @@ These are personal global rules applied to AI coding sessions across tools.
 - Prefer a compact paragraph or two. Use bullets only when they materially improve readability.
 - Do not narrate routine tool use or restate the same conclusion at the end.
 - Surface useful findings directly in chat; do not make a local artifact or `/tmp` file the only deliverable.
+- When asked to see something visually or for a diagram, prefer Mermaid over ASCII or text-only diagrams.
+- Keep Mermaid diagrams readable at normal terminal zoom. Avoid long left-to-right chains; use top-to-bottom layouts, grouped stages, or multiple diagrams when labels or node counts make a row too wide.
+- When asked to "share the code" or similar for repository content, default to a shareable link such as a GitHub permalink rather than pasting the code inline.
 
 ## Coding Style
 
@@ -55,7 +58,8 @@ These are personal global rules applied to AI coding sessions across tools.
 - Run concurrent file-modifying work in separate Git worktrees whenever the repository supports them. Read-only investigation may share the current checkout.
 - In Pi, when asked to delegate work to subagents, use the session-branches `branch` tool (the model-callable counterpart to `/branch`), not manual tmux commands. If that tool is unavailable, say so rather than emulating it.
 - For several independent tasks, pass all tasks in one `branch` call so it creates one named branch per task. Give every task a concise `name` and a self-contained `prompt`.
-- Preserve branch defaults unless the user asks otherwise: omit `withContext` for a fresh session and omit `newWindow` for same-window panes.
+- Keep delegated branches fresh by default unless the user asks to inherit context: omit `withContext` normally and set it only when requested.
+- When the user asks to start or delegate to a subagent, launch each delegated session in a new tmux window by setting `newWindow: true`. Use a same-window pane only when explicitly requested.
 - Default delegated branches and general-purpose agent sessions to the home directory so they can move across repositories and other context without being anchored to one project. Use another working directory only when explicitly requested or when isolated file-modifying work requires a dedicated Git worktree.
 - Before delegating file changes, create one dedicated worktree per task and wait for worktree creation to finish; then pass its absolute path as that task's `cwd`.
 - When running inside a delegated branch, finish and validate the assigned task, then use `merge_branch` to send the handoff to the parent and close the branch.
@@ -73,6 +77,7 @@ These are personal global rules applied to AI coding sessions across tools.
 - Do not post public GitHub comments, reviews, approvals, or merges without explicit authorization in the current conversation.
 - When public review feedback is authorized, prefer pending inline comments anchored to changed lines.
 - Write pull request bodies to a markdown file and pass `--body-file`; do not embed escaped newlines.
+- Ignore repository-provided pull request description templates by default and use these preferences instead unless explicitly asked to follow the template.
 - Never publish local machine paths, secrets, or private artifacts in pull requests, comments, docs, or messages.
 - Merge only after required checks and approvals are complete. Never bypass branch protection or force an admin merge unless explicitly asked for that exact action.
 
