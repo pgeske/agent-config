@@ -11,10 +11,9 @@ window-padding-x = 0
 window-padding-y = 0
 window-padding-color = extend-always
 
-# Use Chrome-style shortcuts to switch tmux windows instead of Ghostty tabs.
-# These send tmux's prefix followed by its previous/next-window bindings.
-keybind = super+shift+[=text:\x02\x08
-keybind = super+shift+]=text:\x02\x0c
+# Let terminal multiplexers handle Chrome-style tab switching.
+keybind = super+shift+[=unbind
+keybind = super+shift+]=unbind
 
 mouse-scroll-multiplier = discrete:1
 # Keep Shift+mouse reserved for Ghostty selection/link handling, even inside tmux/apps.
