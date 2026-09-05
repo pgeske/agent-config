@@ -28,6 +28,7 @@ Load and follow `agent-config-workflow` before editing either repository.
 7. Inspect only this safe machine-local allowlist when recent setup changes may not be represented in the work repository:
    - `~/.tmux.conf` and `~/.tmux.conf.local`
    - `~/.config/ghostty/config`
+   - `~/.config/herdr/config.toml` only (never the rest of the Herdr directory)
    - Pi launchers, keybindings, settings, and themes
 8. Never read or copy machine-local authentication, model catalogs, MCP server definitions, OAuth records, caches, sessions, webhook files, or environment files merely to discover sync candidates.
 
@@ -53,13 +54,14 @@ If both repositories independently solve the same problem, compare simplicity, p
 - Work chat rules, write guards, workflow hooks, channel details, and notification integrations
 - Employer-specific skills, commands, dashboards, release tooling, and cloud configuration
 - Credentials, tokens, API keys, private keys, OAuth state, webhook URLs, copied auth headers, and machine-local secret files
+- Herdr session/workspace/tab state, history, sockets, logs, agent sessions, caches, runtime metadata, machine identity, pairing credentials, and network setup
 
 When uncertain, leave the candidate out and report it instead of weakening the boundary.
 
 ## Reconcile and validate
 
 1. Create a personal branch prefixed with `pgeske/` from the latest personal default branch.
-2. Apply portable changes in cohesive batches. Keep personal-only features and intentional remote changes intact.
+2. Apply portable changes and deletions in cohesive batches. Keep personal-only features and intentional remote changes intact. For retired installed resources, remove only links proven to belong to the source checkout; preserve real user-owned files/directories and unrelated links.
 3. Update docs, installers, lockfiles, and tests alongside behavior changes.
 4. Review the full personal diff for work-only names, domains, paths, account identities, internal package names, and secret-like values. Use targeted searches without printing any discovered secret value.
 5. Run `git diff --check`, the repository typecheck, and its full test suite once at the final checkpoint.

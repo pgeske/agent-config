@@ -2,5 +2,8 @@
   "app.session.resume": "ctrl+k",
   "app.clipboard.pasteImage": ["ctrl+v", "alt+v"],
   "tui.editor.deleteToLineEnd": [],
-  "app.session.toggleNamedFilter": []
+  "app.session.toggleNamedFilter": [],
+  "tui.editor.cursorLineStart": ["home", "ctrl+home"],
+  "app.tree.filter.all": [],
+  "app.models.enableAll": []
 }

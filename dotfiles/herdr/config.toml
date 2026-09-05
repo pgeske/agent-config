@@ -1,0 +1,37 @@
+[theme]
+name = "catppuccin"
+
+# Catppuccin Frappé palette; the built-in catppuccin preset is Mocha.
+[theme.custom]
+accent = "#babbf1"
+panel_bg = "#303446"
+sidebar_bg = "#303446"
+active_row_bg = "#414559"
+selection_bg = "#51576d"
+surface0 = "#414559"
+surface1 = "#51576d"
+surface_dim = "#292c3c"
+overlay0 = "#737994"
+overlay1 = "#838ba7"
+text = "#c6d0f5"
+subtext0 = "#a5adce"
+mauve = "#ca9ee6"
+green = "#a6d189"
+yellow = "#e5c890"
+red = "#e78284"
+blue = "#8caaee"
+teal = "#81c8be"
+peach = "#ef9f76"
+
+[ui]
+status_indicators = "symbols"
+
+[ui.toast]
+delivery = "herdr"
+
+[keys]
+prefix = "ctrl+a"
+previous_tab = ["prefix+p", "cmd+shift+["]
+next_tab = ["prefix+n", "cmd+shift+]"]
+new_tab = ["prefix+c", "ctrl+n"]
+split_vertical = ["prefix+v", "cmd+shift+n"]

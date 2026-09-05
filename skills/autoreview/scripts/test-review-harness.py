@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 ENGINES = ("codex", "claude", "droid", "copilot")
-DEFAULT_ENGINES = ("codex", "claude")
+DEFAULT_ENGINES = ("codex",)
 
 MALICIOUS_INITIAL = """export function uploadPath(name) {
   return `uploads/${name.replaceAll("/", "")}`;
@@ -118,7 +118,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "or a security-sensitive-but-safe patch, then verifies each selected "
             "engine through autoreview."
         ),
-        epilog="Default engines: codex, claude.",
+        epilog="Default engine: codex. Pass --engine repeatedly to opt into multiple engines.",
     )
     parser.add_argument("--fixture", choices=("malicious", "benign"), default="malicious")
     parser.add_argument("--engine", action="append", choices=ENGINES, dest="engines")
@@ -138,6 +138,8 @@ def create_fixture_repo(repo: Path, fixture: str) -> None:
     run(["git", "init", "--quiet"], repo)
     run(["git", "config", "user.name", "Review Fixture"], repo)
     run(["git", "config", "user.email", "review-fixture@example.com"], repo)
+    # Temporary fixture commits must not invoke the user's signing agent.
+    run(["git", "config", "commit.gpgsign", "false"], repo)
 
     write_fixture_file(repo, MALICIOUS_INITIAL if fixture == "malicious" else BENIGN_INITIAL)
     run(["git", "add", "app.js"], repo)

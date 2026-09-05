@@ -138,7 +138,7 @@ Do not dump the whole file back unless the user asks.
 
 ### 3. PR Triage
 
-Before weekly planning, review open pull requests authored by the user's personal GitHub account and sort them into three buckets:
+Before weekly planning, review open pull requests authored by the user's personal GitHub account. First separate **draft** PRs (`isDraft: true`) into a short **Drafts** callout: keep them visible, but outside the actionable review/merge buckets. Sort the remaining PRs into three buckets:
 
 1. **Ready to merge**: approved, required checks passing, no outstanding review requests, and genuinely mergeable.
 2. **Waiting on review**: review is still required, a requested reviewer has not approved, or the PR has gone stale since its last push. Offer to draft a reviewer nudge rather than sending one.
@@ -305,7 +305,7 @@ When converting an existing plain task with no metadata into the new format:
 3. Ask `Did you check your calendar?`
 4. Read `~/notes/wiki/tasks.md` and `~/notes/wiki/weekly-goals.md`
 5. Summarize current weekly goals, carry-over, and existing weekly commitments
-6. Triage open personal pull requests into ready to merge, waiting on review, and blocked
+6. Call out draft personal PRs separately, then triage the remaining PRs into ready to merge, waiting on review, and blocked
 7. Ask what the user wants this week to be about
 8. Draft and save the current week's high-level goals in `weekly-goals.md`
 9. Ask what concrete tasks should go into `today`, `this week`, and `backlog`
