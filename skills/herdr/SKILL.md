@@ -1,6 +1,6 @@
 ---
 name: herdr
-description: "Control Herdr, a terminal multiplexer for coding agents. Use only when the user explicitly mentions Herdr or asks to use Herdr to inspect or control panes, tabs, workspaces, commands, or another agent. Do not use merely because a task could benefit from a background terminal, delegation, or parallel work. Requires HERDR_ENV=1."
+description: "Control Herdr, a terminal multiplexer for coding agents. Use when Philip asks to start, spin up, delegate to, inspect, or close a subagent; Herdr is his default agent launcher. Also use for explicit Herdr pane, tab, workspace, or command requests. Do not create agents merely because a task could benefit from parallel work. Requires HERDR_ENV=1."
 ---
 
 # Herdr
@@ -89,21 +89,15 @@ Creation responses expose the IDs to use next. `workspace create` returns `.resu
 
 ## Start and coordinate an agent
 
-Default to a sibling pane in the current tab and the current working directory. Do not create a workspace, tab, worktree, or different cwd unless the user explicitly requests that topology or location.
-
-Honor a direction requested by the user. Otherwise inspect the caller pane:
+Philip's default subagent launcher is Herdr. Start a fresh named agent in a new tab and preserve the user's focus. Use `$HOME` as the default cwd; for repository changes, first create a dedicated Git worktree and use its absolute path instead. Do not create a new workspace unless asked.
 
 ```bash
-herdr pane layout --pane "$HERDR_PANE_ID"
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$HOME" --label <task-label> --no-focus
 ```
 
-Split a wide pane to the right and a narrow or tall pane down. Avoid repeated same-direction splits that create unusably narrow columns or short rows. Keep the user's focus in the calling pane and explicitly preserve the caller's working directory:
+Read the new pane ID from `.result.root_pane.pane_id`. For multiple independent tasks, create one tab and agent per task, each with a self-contained prompt.
 
-```bash
-herdr pane split --current --direction right --cwd "$PWD" --no-focus
-```
-
-Replace `right` with `down` when appropriate. Read the new pane ID from `.result.pane.pane_id`.
+Use a same-tab pane only when Philip explicitly asks. Honor his requested direction; otherwise inspect the caller layout with `herdr pane layout --pane "$HERDR_PANE_ID"`, split a wide pane right or a narrow/tall pane down, and read `.result.pane.pane_id` from the split response. Avoid repeated splits that leave unusably small panes.
 
 An available shell pane must be at its interactive prompt, with the shell itself in the foreground and no foreground command, editor, or agent running. Start a supported agent in that pane with a useful unique name:
 
@@ -155,7 +149,7 @@ If a wait fails or returns `blocked`, inspect `agent get` and `agent read` befor
 
 ## Run an ordinary command in another pane
 
-Create a sibling pane with the same geometry rule, preserve the caller's working directory, and keep user focus unchanged:
+For an explicitly requested ordinary background command, create a sibling pane (right for a wide pane, down for a narrow/tall pane), preserve the caller's working directory, and keep user focus unchanged:
 
 ```bash
 herdr pane split --current --direction right --cwd "$PWD" --no-focus

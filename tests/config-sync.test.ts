@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, lstat, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, lstat, mkdir, writeFile, readdir, readlink, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
@@ -53,6 +53,9 @@ test("config sync copies managed dotfiles into a fake home", async () => {
     await writeFile(join(piAgentDir, "settings.json"), JSON.stringify({
       defaultProvider: "anthropic",
       defaultModel: "personal-model",
+      modelThinkingLevels: { "anthropic/personal-model": "high" },
+      externalEditor: "nvim",
+      compaction: { enabled: false, reserveTokens: 1000, keepRecentTokens: 2000 },
       packages: ["npm:existing-package", "npm:pi-web-access@0.13.0"],
     }));
     const args = ["--home", home, "--config-home", join(home, ".config"), "--pi-agent-dir", piAgentDir, "--mode", "copy"];
@@ -65,6 +68,9 @@ test("config sync copies managed dotfiles into a fake home", async () => {
     const settings = JSON.parse(await readFile(join(piAgentDir, "settings.json"), "utf8"));
     assert.equal(settings.defaultProvider, "anthropic");
     assert.equal(settings.defaultModel, "personal-model");
+    assert.deepEqual(settings.modelThinkingLevels, { "anthropic/personal-model": "high" });
+    assert.equal(settings.externalEditor, "nvim");
+    assert.equal("compaction" in settings, false);
     assert.equal(settings.tuiMode, "fullscreen");
     assert.equal(settings.theme, "catppuccin-frappe");
     assert.deepEqual(settings.packages, [
@@ -84,6 +90,7 @@ test("config sync copies managed dotfiles into a fake home", async () => {
       : join(home, ".config", "nvim");
     assert.equal(await readFile(join(nvimTarget, "init.lua"), "utf8"), await readFile(join(repoRoot, "dotfiles", "nvim", "init.lua"), "utf8"));
     assert.equal(await readFile(join(home, ".config", "ghostty", "config"), "utf8"), await readFile(join(repoRoot, "dotfiles", "ghostty", "config"), "utf8"));
+    assert.equal(await readFile(join(home, ".config", "herdr", "config.toml"), "utf8"), await readFile(join(repoRoot, "dotfiles", "herdr", "config.toml"), "utf8"));
     if (process.platform !== "win32") {
       assert.equal(await readFile(join(piAgentDir, "bin", "pi"), "utf8"), await readFile(join(repoRoot, "dotfiles", "pi", "bin", "pi"), "utf8"));
     }
@@ -114,6 +121,46 @@ test("config sync symlinks managed dotfiles on non-Windows platforms", { skip: p
       const mcpConfig = await lstat(join(home, ".config", "mcp", "mcp.json"));
       assert.equal(mcpConfig.isSymbolicLink(), true);
     }
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test("config sync backs up only Herdr config and previews retired link removal", { skip: process.platform === "win32" }, async () => {
+  const home = await mkdtemp(join(tmpdir(), "agent-config-herdr-"));
+  try {
+    const herdr = join(home, ".config", "herdr");
+    const piAgentDir = join(home, ".pi", "agent");
+    const extensions = join(piAgentDir, "extensions");
+    await mkdir(herdr, { recursive: true });
+    await mkdir(extensions, { recursive: true });
+    await writeFile(join(herdr, "config.toml"), "user config");
+    await writeFile(join(herdr, "session.json"), "user session state");
+    await symlink(join(repoRoot, "extensions", "fast-compaction"), join(extensions, "fast-compaction"));
+    await symlink(join(home, "third-party"), join(extensions, "session-branches"));
+    await writeFile(join(extensions, "herdr-agent-state.ts"), "official integration");
+    const args = ["--home", home, "--config-home", join(home, ".config"), "--pi-agent-dir", piAgentDir, "--mode", "symlink"];
+
+    const dryRun = await runSync([...args, "--dry-run"]);
+    assert.match(dryRun.stdout, /would remove owned dangling link/);
+    assert.equal((await lstat(join(extensions, "fast-compaction"))).isSymbolicLink(), true);
+    assert.equal(await readFile(join(herdr, "config.toml"), "utf8"), "user config");
+    assert.deepEqual((await readdir(herdr)).sort(), ["config.toml", "session.json"]);
+
+    await runSync(args);
+    await assert.rejects(() => lstat(join(extensions, "fast-compaction")), /ENOENT/);
+    assert.equal(await readlink(join(extensions, "session-branches")), join(home, "third-party"));
+    assert.equal(await readFile(join(extensions, "herdr-agent-state.ts"), "utf8"), "official integration");
+    assert.equal(await readlink(join(herdr, "config.toml")), join(repoRoot, "dotfiles", "herdr", "config.toml"));
+    const backups = (await readdir(herdr)).filter((name) => name.startsWith("config.toml.bak-"));
+    assert.equal(backups.length, 1);
+    assert.equal(await readFile(join(herdr, backups[0]!), "utf8"), "user config");
+    assert.equal(await readFile(join(herdr, "session.json"), "utf8"), "user session state");
+
+    const second = await runSync(args);
+    assert.match(second.stdout, /= Herdr config/);
+    assert.doesNotMatch(second.stdout, /Retired Pi extension link/);
+    assert.equal((await readdir(herdr)).length, 3);
   } finally {
     await rm(home, { recursive: true, force: true });
   }

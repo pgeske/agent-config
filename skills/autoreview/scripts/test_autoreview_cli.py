@@ -54,9 +54,10 @@ output.write_text(json.dumps({
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def run_autoreview(self, *extra: str) -> list[str]:
+    def run_autoreview(self, *extra: str, expected_error: str | None = None) -> list[str]:
         capture = self.root / "codex-args.json"
-        env = os.environ.copy()
+        capture.unlink(missing_ok=True)
+        env = {key: value for key, value in os.environ.items() if not key.startswith("AUTOREVIEW_")}
         env["AUTOREVIEW_CAPTURE"] = str(capture)
         result = subprocess.run(
             [
@@ -75,6 +76,11 @@ output.write_text(json.dumps({
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+        if expected_error is not None:
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(expected_error, result.stderr)
+            self.assertFalse(capture.exists(), "invalid input must not launch a reviewer")
+            return []
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
         return json.loads(capture.read_text())
 
@@ -83,6 +89,50 @@ output.write_text(json.dumps({
 
     def test_codex_user_config_can_be_enabled_explicitly(self) -> None:
         self.assertNotIn("--ignore-user-config", self.run_autoreview("--codex-user-config"))
+
+    def test_default_reviewer_uses_sol_xhigh_with_native_auth(self) -> None:
+        args = self.run_autoreview()
+        self.assertEqual(args[args.index("--model") + 1], "gpt-5.6-sol")
+        self.assertIn('model_reasoning_effort="xhigh"', args)
+        self.assertFalse(any(value.startswith("model_provider=") for value in args))
+        self.assertFalse(any("auth.command=" in value for value in args))
+        self.assertIn("features.multi_agent=false", args)
+        self.assertEqual(args[args.index("-s") + 1], "read-only")
+
+    def test_explicit_model_and_thinking_override_defaults(self) -> None:
+        args = self.run_autoreview("--model", "custom-model", "--thinking", "high")
+        self.assertEqual(args[args.index("--model") + 1], "custom-model")
+        self.assertIn('model_reasoning_effort="high"', args)
+        self.assertNotIn('model_reasoning_effort="xhigh"', args)
+
+    def test_inline_reviewer_model_and_max_are_preserved(self) -> None:
+        args = self.run_autoreview("--reviewers", "codex:custom-model:max")
+        self.assertEqual(args[args.index("--model") + 1], "custom-model")
+        self.assertIn('model_reasoning_effort="max"', args)
+
+    def test_native_codex_auth_can_be_selected_explicitly(self) -> None:
+        args = self.run_autoreview("--codex-config", "none", "--model", "gpt-5.6-sol")
+        self.assertFalse(any(value.startswith("model_provider=") for value in args))
+        self.assertIn("--ignore-user-config", args)
+
+    def test_custom_codex_config_can_be_selected_explicitly(self) -> None:
+        config = self.root / "codex-config.json"
+        config.write_text(json.dumps({"model_provider": "test", "model_providers.test.name": "Test provider"}))
+        args = self.run_autoreview("--codex-config", str(config))
+        self.assertIn('model_provider="test"', args)
+        self.assertFalse(any("auth.command=" in value for value in args))
+
+    def test_invalid_codex_config_does_not_launch_reviewer(self) -> None:
+        config = self.root / "codex-config.json"
+        config.write_text(json.dumps({"model_providers": {"test": {}}}))
+        self.run_autoreview("--codex-config", str(config), expected_error="flat -c settings")
+
+    def test_empty_local_diff_is_not_reported_as_clean(self) -> None:
+        (self.repo / "app.py").write_text("value = 1\n")
+        self.run_autoreview(expected_error="no changes to review")
+
+    def test_empty_branch_diff_does_not_launch_reviewer(self) -> None:
+        self.run_autoreview("--mode", "branch", "--base", "HEAD", expected_error="no changes to review")
 
 
 if __name__ == "__main__":

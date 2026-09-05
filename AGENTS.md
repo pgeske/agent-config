@@ -56,13 +56,13 @@ These are personal global rules applied to AI coding sessions across tools.
 
 - Assume other agents may be working in the same repository. Treat pre-existing changes as potentially theirs: do not revert, delete, overwrite, or reformat unrelated work, and re-check status before editing shared files.
 - Run concurrent file-modifying work in separate Git worktrees whenever the repository supports them. Read-only investigation may share the current checkout.
-- In Pi, when asked to delegate work to subagents, use the session-branches `branch` tool (the model-callable counterpart to `/branch`), not manual tmux commands. If that tool is unavailable, say so rather than emulating it.
-- For several independent tasks, pass all tasks in one `branch` call so it creates one named branch per task. Give every task a concise `name` and a self-contained `prompt`.
-- Keep delegated branches fresh by default unless the user asks to inherit context: omit `withContext` normally and set it only when requested.
-- When the user asks to start or delegate to a subagent, launch each delegated session in a new tmux window by setting `newWindow: true`. Use a same-window pane only when explicitly requested.
-- Default delegated branches and general-purpose agent sessions to the home directory so they can move across repositories and other context without being anchored to one project. Use another working directory only when explicitly requested or when isolated file-modifying work requires a dedicated Git worktree.
-- Before delegating file changes, create one dedicated worktree per task and wait for worktree creation to finish; then pass its absolute path as that task's `cwd`.
-- When running inside a delegated branch, finish and validate the assigned task, then use `merge_branch` to send the handoff to the parent and close the branch.
+- When asked to start or delegate to a subagent, load the `herdr` skill and use the Herdr CLI. Do not use another launcher unless explicitly requested.
+- Verify `HERDR_ENV=1` before controlling Herdr. If outside Herdr, report the blocker rather than attaching to another session or silently switching launchers.
+- Default delegated and general-purpose agent sessions to `$HOME`, unless a different location is requested or isolated file changes require a dedicated Git worktree.
+- For independent tasks, create one named agent per task with a self-contained prompt. Start fresh by default; inherit context only when requested.
+- Start each subagent in a new Herdr tab with `--no-focus`. Use a same-tab pane only when explicitly requested.
+- Before delegating file changes, create one dedicated worktree per task and wait for creation to finish; then use its absolute path as the new tab's `cwd`.
+- Finish and validate delegated work, report results directly, and leave the session open for inspection. Do not auto-close or merge the session unless explicitly asked.
 
 ## Git Preferences
 
@@ -72,7 +72,12 @@ These are personal global rules applied to AI coding sessions across tools.
 - Sign commits and verify the commits being pushed with `git log --format='%h %G? %GS %s' <base>..HEAD`.
 - Use a separate signed commit for each coherent review-feedback batch instead of amending shared commits unless explicitly asked.
 - Prefer GitHub's native stacking support (`gh stack`) for stacked pull requests instead of representing the stack only through manually selected base branches, unless explicitly asked otherwise.
-- For non-trivial multi-file changes, include a `Review guide` section in the PR description listing changed files in review order, each with a one- or two-sentence ELI5 explanation of what changed and how it contributes to the fix.
+- Structure PR descriptions as `TL;DR`, `How it works`, `Review guide`, and `Validation`, in that order. Use plain-English explanations for readers unfamiliar with the change.
+- `TL;DR`: briefly explain the problem, why the change exists, and what it accomplishes. Link relevant designs or issues when useful.
+- `How it works`: use 3–5 connected steps in execution order, usually about 100–150 words total. Give each step a short action label and only the details needed to orient a reviewer.
+- `Review guide`: list changed files in recommended reading order with one or two sentences about each file's role and what to look for.
+- `Validation`: state what was tested on the current change, what the checks establish, and any remaining gaps or rollout caveats. Keep this last and scale each section to the change.
+- Keep review-helper results out of PR descriptions unless explicitly asked to publish them.
 - Run the repository's lint command before opening a pull request or declaring a branch review-ready when one exists.
 - Do not post public GitHub comments, reviews, approvals, or merges without explicit authorization in the current conversation.
 - When public review feedback is authorized, prefer pending inline comments anchored to changed lines.

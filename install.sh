@@ -348,6 +348,9 @@ if [[ -d "$EXTENSIONS_DIR" && ${#extension_targets[@]} -gt 0 ]]; then
 
     mkdir -p "$extension_target"
 
+    # Always retire deleted resources, including dangling links, without --prune.
+    node "$ROOT_DIR/scripts/prune-extension-links.mjs" "$EXTENSIONS_DIR" "$extension_target"
+
     if [[ -d "$ROOT_DIR/node_modules" ]]; then
       if [[ -e "$extension_target/node_modules" || -L "$extension_target/node_modules" ]]; then
         if [[ -L "$extension_target/node_modules" ]] && [[ $(readlink -f "$extension_target/node_modules" || true) == "$ROOT_DIR/node_modules" ]]; then

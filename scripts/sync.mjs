@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
+import { pruneExtensionLinks } from "./prune-extension-links.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
@@ -99,6 +100,12 @@ function resolveUserPath(input, home) {
 
 function managedItems(options) {
   const items = [
+    {
+      label: "Herdr config",
+      type: "file",
+      source: path.join(repoRoot, "dotfiles", "herdr", "config.toml"),
+      target: path.join(options.configHome, "herdr", "config.toml"),
+    },
     {
       label: "Pi AGENTS.md",
       type: "file",
@@ -306,13 +313,20 @@ function mergeJson(current, overlay, parentKey = "") {
   return overlay;
 }
 
+// Keep unrelated local choices while returning compaction to native defaults.
+function mergePiSettings(current, overlay) {
+  const settings = mergeJson(current, overlay);
+  delete settings.compaction;
+  return settings;
+}
+
 async function targetIsCurrent(item, mode) {
   const targetStat = await safeLstat(item.target);
   if (!targetStat) return false;
 
   if (item.type === "json-merge") {
     const [current, overlay] = await Promise.all([readJson(item.target), readJson(item.source)]);
-    return isDeepStrictEqual(current, mergeJson(current, overlay));
+    return isDeepStrictEqual(current, mergePiSettings(current, overlay));
   }
 
   if (mode === "symlink") {
@@ -341,7 +355,7 @@ async function backupTarget(target) {
 async function replaceTarget(item, options) {
   const exists = await pathExists(item.target);
   const mergedJson = item.type === "json-merge"
-    ? mergeJson(exists ? await readJson(item.target) : {}, await readJson(item.source))
+    ? mergePiSettings(exists ? await readJson(item.target) : {}, await readJson(item.source))
     : null;
   let backupPath = null;
 
@@ -373,6 +387,16 @@ async function replaceTarget(item, options) {
 async function sync(options) {
   const items = managedItems(options);
   const results = [];
+  const staleLinks = await pruneExtensionLinks(
+    path.join(repoRoot, "extensions"), path.join(options.piAgentDir, "extensions"), options,
+  );
+  for (const target of staleLinks) {
+    results.push({
+      item: { label: "Retired Pi extension link", target },
+      action: "remove",
+      detail: options.dryRun ? "would remove owned dangling link" : "removed owned dangling link",
+    });
+  }
 
   for (const item of items) {
     if (!(await pathExists(item.source))) {
@@ -407,7 +431,7 @@ function renderResults(results, options) {
   const lines = [];
   lines.push(`${options.dryRun ? "Dry run" : "Sync complete"} (${options.mode})`);
   for (const result of results) {
-    const prefix = { ok: "=", create: "+", replace: "~", skip: "-" }[result.action] ?? "?";
+    const prefix = { ok: "=", create: "+", replace: "~", skip: "-", remove: "-" }[result.action] ?? "?";
     lines.push(`${prefix} ${result.item.label}: ${result.item.target} (${result.detail})`);
   }
   return lines.join("\n");
