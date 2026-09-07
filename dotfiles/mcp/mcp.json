@@ -9,7 +9,7 @@
         "node_modules/@pgeske/mac-computer-use-mcp/dist/cli.js"
       ],
       "cwd": "${HOME}/agent-config",
-      "lifecycle": "lazy",
+      "lifecycle": "lazy-keep-alive",
       "requestTimeoutMs": 180000
     },
     "peekaboo": {
