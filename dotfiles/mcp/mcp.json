@@ -6,9 +6,7 @@
     "mac-computer-use": {
       "command": "node",
       "args": [
-        "node_modules/@pgeske/mac-computer-use-mcp/dist/cli.js",
-        "--trust-app",
-        "com.apple.calculator"
+        "node_modules/@pgeske/mac-computer-use-mcp/dist/cli.js"
       ],
       "cwd": "${HOME}/agent-config",
       "lifecycle": "lazy",

@@ -14,7 +14,7 @@ Use the `mac-computer-use` MCP server, not Peekaboo or an alternate GUI automati
 3. Prefer fresh accessibility element IDs; use screenshot coordinates when accessibility is incomplete. Make known actions sequentially, then inspect the app again to verify the actual result.
 4. Stop with `computer_use_stop` when finished. Stop, cancellation, errors, and idle expiry invalidate the inspected state. Never automatically retry an uncertain action.
 
-Only Calculator is pretrusted in shared configuration. Other apps require approval for each operation. Native OpenAI/macOS prompts still require the user's decision, even for Calculator. Do not change trust configuration, auto-answer an approval, or grant macOS permissions to get past a blocker.
+One MCP approval enables computer use across apps for the current session. Routine inspection, clicking, typing, and navigation do not ask again. Stop, idle expiry, errors, and reconnecting clear that approval. No apps are permanently pretrusted in shared configuration. Native OpenAI/macOS prompts still require the user's decision. Do not change trust configuration, auto-answer an approval, or grant macOS permissions to get past a blocker.
 
 ## Safety
 
