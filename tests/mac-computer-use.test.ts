@@ -15,5 +15,5 @@ test("desktop MCP uses our pinned release with session approval and no permanent
   ]);
   assert.equal(server.lifecycle, "lazy");
   assert.equal(config.mcpServers.peekaboo.disabled, true);
-  assert.equal(manifest.dependencies["@pgeske/mac-computer-use-mcp"], "https://github.com/pgeske/mac-computer-use-mcp/releases/download/v0.2.0/pgeske-mac-computer-use-mcp-0.2.0.tgz");
+  assert.equal(manifest.dependencies["@pgeske/mac-computer-use-mcp"], "https://github.com/pgeske/mac-computer-use-mcp/releases/download/v0.3.0/pgeske-mac-computer-use-mcp-0.3.0.tgz");
 });

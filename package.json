@@ -16,7 +16,7 @@
     "@earendil-works/pi-ai": "^0.84.1",
     "@earendil-works/pi-coding-agent": "^0.84.1",
     "@earendil-works/pi-tui": "^0.84.1",
-    "@pgeske/mac-computer-use-mcp": "https://github.com/pgeske/mac-computer-use-mcp/releases/download/v0.2.0/pgeske-mac-computer-use-mcp-0.2.0.tgz"
+    "@pgeske/mac-computer-use-mcp": "https://github.com/pgeske/mac-computer-use-mcp/releases/download/v0.3.0/pgeske-mac-computer-use-mcp-0.3.0.tgz"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
