@@ -3,6 +3,17 @@
     "mcpFooterStatus": "off"
   },
   "mcpServers": {
+    "mac-computer-use": {
+      "command": "node",
+      "args": [
+        "node_modules/@pgeske/mac-computer-use-mcp/dist/cli.js",
+        "--trust-app",
+        "com.apple.calculator"
+      ],
+      "cwd": "${HOME}/agent-config",
+      "lifecycle": "lazy",
+      "requestTimeoutMs": 180000
+    },
     "peekaboo": {
       "disabled": true,
       "command": "peekaboo",

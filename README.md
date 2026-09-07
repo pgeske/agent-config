@@ -111,7 +111,7 @@ Keep these outside git:
 - API keys, OAuth tokens, webhook URLs, and private keys
 - Herdr session/workspace/tab state, history, sockets, logs, agent sessions, caches, runtime metadata, machine identity, pairing credentials, and network setup
 
-The managed `~/.config/mcp/mcp.json` configures Peekaboo locally through the MCP adapter. Project `.mcp.json` files and Pi-specific overrides in `~/.pi/agent/mcp.json` remain machine-local; run `/mcp setup` for interactive additions. The adapter also uses the system credential store. `.env.example` shows environment-variable placeholders for optional personal integrations. The voice bridge is inert until a compatible local broker is listening at `~/.pi/voice/control.sock`.
+The managed `~/.config/mcp/mcp.json` enables our [Mac Computer Use MCP](https://github.com/pgeske/mac-computer-use-mcp) through the MCP adapter and keeps Peekaboo disabled. Its compiled release is pinned in `package.json` and installed by bootstrap. Only Calculator (`com.apple.calculator`) is pretrusted; other apps require MCP approval, and native permissions are always preserved. Run `/reload` in existing Pi sessions after syncing. Use `/mcp disable mac-computer-use` followed by `/reload` to disable desktop tools. Project `.mcp.json` files and Pi-specific overrides in `~/.pi/agent/mcp.json` remain machine-local; run `/mcp setup` for interactive additions. The adapter also uses the system credential store. `.env.example` shows environment-variable placeholders for optional personal integrations. The voice bridge is inert until a compatible local broker is listening at `~/.pi/voice/control.sock`.
 
 ## What was intentionally not mirrored
 
