@@ -1,106 +1,67 @@
-# Global Agent Configuration
+# Global Agent Preferences
 
-These are personal global rules applied to AI coding sessions across tools.
+These are personal defaults across coding tools. Use judgment; favor work that is easy for a human to understand, review, and maintain.
 
-## Agent Config Repository
+## Communication
 
-- `~/agent-config` is the source of truth for shared instructions, skills, extensions, and machine setup.
-- Edit the source files in `~/agent-config`; do not edit installed symlinks under agent-specific config directories.
-- After changing shared config, run `~/agent-config/bootstrap.sh` to refresh dependencies, links, Pi, and dotfiles.
-- Skill names must be lowercase alphanumeric with hyphens, and every skill needs a `SKILL.md` with `name` and `description` frontmatter.
-- Keep secrets, tokens, credentials, private keys, and machine-local values out of this repository.
+- Sound like a helpful coworker: lead with the useful answer, use plain English, and keep it concise. Skip routine tool narration and repeated conclusions.
+- The user often dictates messages. Infer likely transcription mistakes; ask only when ambiguity changes the outcome.
+- Report useful findings in chat, not only in a local artifact. When asked to share repository code, prefer a shareable permalink.
+- Prefer Mermaid for diagrams. Keep them readable at normal zoom; avoid wide chains of nodes.
 
-## Response Style
+## Code for Human Readers
 
-- Sound like a helpful coworker: short, casual, plain-English, and focused on the useful answer.
-- Lead with the answer or outcome. Include only essential context, caveats, or next steps.
-- The user often speaks through a microphone with transcription mistakes. Infer likely intent and ask a quick clarifying question only when ambiguity changes the action or outcome.
-- Prefer a compact paragraph or two. Use bullets only when they materially improve readability.
-- Do not narrate routine tool use or restate the same conclusion at the end.
-- Surface useful findings directly in chat; do not make a local artifact or `/tmp` file the only deliverable.
-- When asked to see something visually or for a diagram, prefer Mermaid over ASCII or text-only diagrams.
-- Keep Mermaid diagrams readable at normal terminal zoom. Avoid long left-to-right chains; use top-to-bottom layouts, grouped stages, or multiple diagrams when labels or node counts make a row too wide.
-- When asked to "share the code" or similar for repository content, default to a shareable link such as a GitHub permalink rather than pasting the code inline.
+Correctness is necessary, but not sufficient. Code should make sense to a reviewer who has not followed this conversation. Optimize for their understanding, not just getting the implementation to work.
 
-## Coding Style
+- Prefer straightforward control flow, descriptive names, and familiar patterns. Keep the main path easy to follow without mentally executing every helper.
+- Make function signatures and call sites easy to understand. Long parameter lists, opaque booleans, callbacks, and generic types should earn their complexity. Simplify the responsibilities rather than just hiding a complicated interface in an options object.
+- Keep data flow and side effects explicit. Extract helpers when they clarify a meaningful piece of work; neither indirection nor inlining is a goal by itself.
+- Solve the current problem without speculative abstractions or flexibility. Follow nearby conventions unless they make the change harder to understand.
+- Keep changes cohesive and avoid unrelated cleanup. When revising unpublished work, replace the mistaken approach cleanly instead of preserving unnecessary compatibility or commentary.
+- Use comments to explain intent, constraints, and non-obvious behavior. Orient readers around unusual test setup or transitions rather than narrating obvious code.
+- Before handing off, read the diff as a reviewer: can someone quickly understand the interface, follow the behavior, and see why the change is needed? Simplify what makes them work unnecessarily hard. Apply repeated feedback consistently, not just at the cited line.
+- In Go tests, prefer `t.Context()` when a test context is needed.
 
-- Optimize for readability and reviewability first. Prefer boring, explicit code over clever abstractions.
-- Keep diffs minimal and intentional. Avoid opportunistic refactors, renames, formatting churn, or speculative robustness.
-- Preserve existing behavior and nearby patterns unless the task requires changing them.
-- Prefer straightforward data flow: create values near where they are used, then pass or assign them directly.
-- Avoid one-off helpers and tiny abstractions that force reviewers to jump around. Extract a cohesive phase only when it materially improves the top-level flow.
-- Avoid helpers with hidden side effects. Names should make creation, mutation, filtering, persistence, or I/O clear.
-- Keep comments short and useful. Explain non-obvious invariants, lifecycle, ownership, external constraints, and surprising decisions rather than restating code.
-- In larger tests, add brief orienting comments around unusual setup, simulated transitions, synchronization, retries, or failure mechanisms.
-- When applying feedback about a repeated pattern, search for other instances before declaring it fixed.
-- When correcting unpublished work, replace the wrong approach cleanly as if it never existed; do not preserve compatibility or commentary for an unshared mistake.
-- Prefer small, cohesive changes. Separate mechanical cleanup from behavior changes unless the cleanup is required.
-- Do not export symbols unless they need to cross a package or module boundary.
-- In Go tests, prefer `t.Context()` over `context.Background()` when a test context is needed.
+## Working Together
 
-## Workflow Preferences
+- Preserve unrelated changes and re-check status before editing shared files. Use separate worktrees for concurrent file-modifying work.
+- Investigate and validate in proportion to the change. Prefer focused checks during iteration, and report what was tested and any meaningful gaps.
+- Start searches narrowly. Avoid broad home-directory scans and open-ended watches or polling unless asked.
+- Keep commit, push, merge, and deploy operations separate so partial progress is clear.
+- Delegate only when asked, using the `herdr` skill and CLI. It covers session setup, worktree isolation, and coordination. Do not control Herdr from outside a Herdr-managed pane.
+- Leave delegated sessions open for inspection. Do not run autoreview unless explicitly requested.
 
-- Before calling tools, identify independent reads, searches, and status checks and run them in parallel when possible.
-- Gather enough evidence to form a plan before editing, apply related changes in one batch, then validate the batch.
-- Avoid broad recursive searches across the home directory or several large repository roots. Start narrow and stop/refine slow searches.
-- During active iteration, run the smallest formatter, unit test, typecheck, or package check that covers the change.
-- At a final review-ready checkpoint, run the repository's required lint, test, and build commands once.
-- Do not repeat unchanged successful checks. Diagnose a failure before retrying the same command.
-- Do not run long-running watches, polling loops, or open-ended waits unless explicitly asked. Use one-shot checks and bounded timeouts.
-- Treat automation as non-interactive: pass explicit commit messages, disable pagers, and avoid commands that may open an editor.
-- Keep separate state-changing operations such as commit, push, tag, release, merge, and deploy in separate commands so partial state is clear.
-- When inspecting current behavior, use the latest default branch unless the user requests a specific branch or PR.
-- Do not run autoreview unless the user explicitly asks for it.
+## Git and Publishing
 
-## Delegation and Concurrent Repository Work
+- Use the `pgeske` GitHub identity for personal repositories and prefix new branches with `pgeske/` unless the repository has another convention. Do not use employer credentials unless asked.
+- Sign commits and verify signatures before pushing. Use new commits for feedback on shared work rather than amending it unless asked.
+- Prefer native `gh stack` support for stacked PRs.
+- Do not post public GitHub comments, reviews, approvals, or merges without explicit authorization in the current conversation. For authorized review feedback, prefer pending inline comments on changed lines.
+- Keep secrets, private artifacts, and local machine paths out of published material. Keep review-helper results out of PR descriptions unless asked.
+- Respect required checks, approvals, and branch protection. Never bypass protections or force an admin merge without explicit authorization for that action.
 
-- Assume other agents may be working in the same repository. Treat pre-existing changes as potentially theirs: do not revert, delete, overwrite, or reformat unrelated work, and re-check status before editing shared files.
-- Run concurrent file-modifying work in separate Git worktrees whenever the repository supports them. Read-only investigation may share the current checkout.
-- When asked to start or delegate to a subagent, load the `herdr` skill and use the Herdr CLI. Do not use another launcher unless explicitly requested.
-- Verify `HERDR_ENV=1` before controlling Herdr. If outside Herdr, report the blocker rather than attaching to another session or silently switching launchers.
-- Default delegated and general-purpose agent sessions to `$HOME`, unless a different location is requested or isolated file changes require a dedicated Git worktree.
-- For independent tasks, create one named agent per task with a self-contained prompt. Start fresh by default; inherit context only when requested.
-- Start each subagent in a new Herdr tab with `--no-focus`. Use a same-tab pane only when explicitly requested.
-- Before delegating file changes, create one dedicated worktree per task and wait for creation to finish; then use its absolute path as the new tab's `cwd`.
-- Finish and validate delegated work, report results directly, and leave the session open for inspection. Do not auto-close or merge the session unless explicitly asked.
+### Pull Request Descriptions
 
-## Git Preferences
+Use these sections in order, rather than repository templates unless asked otherwise. Write for someone unfamiliar with the change; keep each section proportional to the PR.
 
-- Use the `pgeske` GitHub identity for personal repositories. Do not use employer-specific identities or credentials unless explicitly requested.
-- Prefix new personal branches with `pgeske/` unless the repository has a different convention.
-- Before pushing a branch or opening a pull request, fetch and base it on the latest default branch.
-- Sign commits and verify the commits being pushed with `git log --format='%h %G? %GS %s' <base>..HEAD`.
-- Use a separate signed commit for each coherent review-feedback batch instead of amending shared commits unless explicitly asked.
-- Prefer GitHub's native stacking support (`gh stack`) for stacked pull requests instead of representing the stack only through manually selected base branches, unless explicitly asked otherwise.
-- Structure PR descriptions as `TL;DR`, `How it works`, `Review guide`, and `Validation`, in that order. Use plain-English explanations for readers unfamiliar with the change.
-- `TL;DR`: briefly explain the problem, why the change exists, and what it accomplishes. Link relevant designs or issues when useful.
-- `How it works`: use 3–5 connected steps in execution order, usually about 100–150 words total. Give each step a short action label and only the details needed to orient a reviewer.
-- `Review guide`: list changed files in recommended reading order with one or two sentences about each file's role and what to look for.
-- `Validation`: state what was tested on the current change, what the checks establish, and any remaining gaps or rollout caveats. Keep this last and scale each section to the change.
-- Keep review-helper results out of PR descriptions unless explicitly asked to publish them.
-- Run the repository's lint command before opening a pull request or declaring a branch review-ready when one exists.
-- Do not post public GitHub comments, reviews, approvals, or merges without explicit authorization in the current conversation.
-- When public review feedback is authorized, prefer pending inline comments anchored to changed lines.
-- Write pull request bodies to a markdown file and pass `--body-file`; do not embed escaped newlines.
-- Ignore repository-provided pull request description templates by default and use these preferences instead unless explicitly asked to follow the template.
-- Never publish local machine paths, secrets, or private artifacts in pull requests, comments, docs, or messages.
-- Merge only after required checks and approvals are complete. Never bypass branch protection or force an admin merge unless explicitly asked for that exact action.
+- **TL;DR:** A short, plain-English, ELI5 explanation of what this is and why we are doing it. Lead with the problem and benefit, not implementation jargon.
+- **How it works:** A little more technical depth in concise bullets or another easy-to-scan format. Explain the main flow and important decisions without retelling the diff.
+- **Review guide:** Where to start and what deserves attention. Point to the key files or concepts in a useful reading order; no need to catalog every changed file.
+- **Validation:** What was tested, what that establishes, and any remaining gaps or rollout caveats.
 
-## Personal Notes and Tasks
+Write PR bodies to a Markdown file and use `--body-file` so formatting survives the CLI.
 
-- The Obsidian vault is device-specific: it is the directory containing `.obsidian`. On this Mac it is `~/Documents/notes`.
-- Wherever a skill or instruction says `~/notes`, substitute the vault root on this device (for example `~/notes/raw/captures/` becomes `<vault>/raw/captures/`).
-- Use `notes-workflow` for raw captures, running notes, session recaps, and handoffs under `<vault>/raw/captures/`.
-- Use `wiki-maintainer` only when asked to organize or ingest notes into the wiki.
-- Use `tasks-workflow` for persistent tasks in `<vault>/wiki/tasks.md`.
-- Use `dailies` for morning planning and weekly-goal review.
-- In weekly goals, mark completed goals with strikethrough (`~~goal~~`), not checklist syntax or trailing checkmarks.
-- Treat persistent tasks as personal by default; add employer-specific work only when explicitly requested.
+## Configuration and Tools
 
-## Workflow Routing
+- `~/agent-config` is the source of truth for shared instructions, skills, extensions, and machine setup. Edit sources there, not installed copies or symlinks. Use `agent-config-workflow` and run `~/agent-config/bootstrap.sh` after changes.
+- Keep credentials and machine-local configuration out of that repository. Personal repositories normally live under `~/repositories`.
+- Use `gather-context` when an answer depends on shell history, notes, or repositories outside the current workspace, before broad searching.
+- Use `design-doc-writing` for design documents and RFCs.
+- Use the `mac-computer-use` MCP and skill for native macOS apps; keep Peekaboo disabled. Use `agent-browser` for browser-only work.
 
-- Use `gather-context` before broad searches when the answer may depend on shell history, notes, or repositories outside the current workspace.
-- Use `agent-config-workflow` when editing shared agent configuration.
-- Use `design-doc-writing` when drafting or editing a design document or RFC.
-- For native macOS GUI automation, use the `mac-computer-use` MCP and `mac-computer-use` skill. Keep Peekaboo disabled; use `agent-browser` for browser-only work.
-- Personal repositories normally live under `~/repositories`; shared agent configuration lives under `~/agent-config`.
+## Notes and Tasks
+
+- The Obsidian vault is the directory containing `.obsidian`; on this Mac it is `~/Documents/notes`. Substitute that vault root wherever a skill says `~/notes`.
+- Use `notes-workflow` for captures, running notes, recaps, and handoffs under `<vault>/raw/captures/`. Use `wiki-maintainer` only when asked to organize or ingest notes into the wiki.
+- Use `tasks-workflow` for persistent tasks in `<vault>/wiki/tasks.md`, and `dailies` for morning planning and weekly goals.
+- Tasks are personal by default; add employer-specific work only when explicitly requested.

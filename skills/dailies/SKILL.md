@@ -52,7 +52,7 @@ Rules:
 - Prefer the Monday date for the section heading.
 - If the current week already has a section, update that section rather than appending a duplicate.
 - Preserve older weekly sections.
-- Do not force checklist syntax in weekly goals.
+- Do not force checklist syntax in weekly goals. Mark completed goals with strikethrough (`~~goal~~`), not checklist syntax or trailing checkmarks, in both the history and current-week mirror.
 - Keep the goals concise enough to review during future dailies.
 
 Also mirror the current week's goals at the top of `~/notes/wiki/tasks.md` in a visible `## weekly goal` section so the user sees them during normal task review:
