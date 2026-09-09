@@ -5,7 +5,7 @@ description: Use when native macOS GUI work needs reliable screen capture, acces
 
 # Peekaboo macOS Automation
 
-Use the `peekaboo` MCP server for native macOS applications. Browser-only work should continue to use the `agent-browser` skill.
+Use the `peekaboo` MCP server for native macOS applications.
 
 ## Workflow
 

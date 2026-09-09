@@ -5,7 +5,7 @@ description: Operate native macOS apps through our standalone mac-computer-use M
 
 # Mac Computer Use
 
-Use the `mac-computer-use` MCP server, not Peekaboo or an alternate GUI automation path. It uses OpenAI's installed Computer Use backend; the current Pi model chooses the actions. For browser-only work, prefer `agent-browser`.
+Use the `mac-computer-use` MCP server, not Peekaboo or an alternate GUI automation path. It uses OpenAI's installed Computer Use backend; the current Pi model chooses the actions.
 
 ## Workflow
 

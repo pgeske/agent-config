@@ -51,10 +51,6 @@ test_install_all_creates_opencode_agents_symlink() (
     "$ROOT_DIR/AGENTS.md"
 
   assert_symlink_target \
-    "$home_dir/.pi/agent/skills/agent-browser" \
-    "$ROOT_DIR/skills/agent-browser"
-
-  assert_symlink_target \
     "$home_dir/.pi/agent/skills/sync-agent-config" \
     "$ROOT_DIR/skills/sync-agent-config"
 
@@ -223,6 +219,33 @@ test_prune_removes_stale_extension_links() (
   }
 )
 
+test_prune_removes_deleted_skill_links_and_preserves_unmanaged_entries() (
+  local home_dir
+  local target
+
+  home_dir=$(mktemp -d)
+  trap 'rm -rf "$home_dir"' EXIT
+
+  # Reproduce retirement after the source directory has already been deleted.
+  for target in .openclaw/workspace/skills .opencode/skills .config/opencode/skills .claude/skills .agents/skills .pi/agent/skills; do
+    mkdir -p "$home_dir/$target/local-skill"
+    printf 'local-only\n' > "$home_dir/$target/local-skill/SKILL.md"
+    ln -s "$ROOT_DIR/skills/retired-test-skill" "$home_dir/$target/retired-test-skill"
+    ln -s "$home_dir/unmanaged/missing-skill" "$home_dir/$target/foreign-skill"
+  done
+
+  run_install "$home_dir" --prune >/dev/null
+
+  for target in .openclaw/workspace/skills .opencode/skills .config/opencode/skills .claude/skills .agents/skills .pi/agent/skills; do
+    [[ ! -e "$home_dir/$target/retired-test-skill" && ! -L "$home_dir/$target/retired-test-skill" ]] || {
+      printf 'expected deleted skill link to be pruned from %s\n' "$target" >&2
+      return 1
+    }
+    [[ $(readlink "$home_dir/$target/foreign-skill") == "$home_dir/unmanaged/missing-skill" ]]
+    [[ $(<"$home_dir/$target/local-skill/SKILL.md") == local-only ]]
+  done
+)
+
 test_managed_files_do_not_reference_legacy_plugin() (
   assert_no_matches 'super''powers' \
     "$ROOT_DIR/AGENTS.md" \
@@ -293,6 +316,7 @@ main() {
   test_extension_file_conflict_requires_force
   test_extension_target_root_symlink_requires_force
   test_prune_removes_stale_extension_links
+  test_prune_removes_deleted_skill_links_and_preserves_unmanaged_entries
   test_existing_unmanaged_agents_file_requires_force
   test_force_replaces_stale_target_root_symlink
   test_managed_files_do_not_reference_legacy_plugin

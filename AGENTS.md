@@ -57,7 +57,7 @@ Write PR bodies to a Markdown file and use `--body-file` so formatting survives 
 - Keep credentials and machine-local configuration out of that repository. Personal repositories normally live under `~/repositories`.
 - Use `gather-context` when an answer depends on shell history, notes, or repositories outside the current workspace, before broad searching.
 - Use `design-doc-writing` for design documents and RFCs.
-- Use the `mac-computer-use` MCP and skill for native macOS apps; keep Peekaboo disabled. Use `agent-browser` for browser-only work.
+- Use the `mac-computer-use` MCP and skill for native macOS apps; keep Peekaboo disabled.
 
 ## Notes and Tasks
 
