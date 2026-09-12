@@ -8,6 +8,7 @@ These are personal defaults across coding tools. Use judgment; favor work that i
 - The user often dictates messages. Infer likely transcription mistakes; ask only when ambiguity changes the outcome.
 - Report useful findings in chat, not only in a local artifact. When asked to share repository code, prefer a shareable permalink.
 - Prefer Mermaid for diagrams. Keep them readable at normal zoom; avoid wide chains of nodes.
+- Use emojis as visual anchors: prefix sections, steps, and list items with a relevant emoji so Philip (a visual learner with ADHD) can see the shape of a message at a glance. Roughly one emoji per section or step — signposts, not decoration.
 
 ## Code for Human Readers
 
