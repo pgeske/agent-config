@@ -65,6 +65,39 @@ npm run sync:dry-run
 
 Stable Pi is pinned to `0.84.1`. The experimental Pi source is pinned to commit [`28657a2ffa6dbeccba74c166682e7a7ee547f5b4`](https://github.com/badlogic/pi-mono/commit/28657a2ffa6dbeccba74c166682e7a7ee547f5b4) and built under `~/.pi/experimental/pi-main-28657a2`.
 
+## Coordinator continuity
+
+A coordinator can keep its working context outside any one session:
+
+- `/catch-up [focus]` reads the current briefing, recent daily logs, and relevant reports.
+- `/wrap-up [focus]` updates that context and requests available checkpoints from its known workers.
+- `/worker-handoff <path and assignment>` writes a worker report without closing its session.
+
+These prompt shortcuts use the [coordinator-memory](skills/coordinator-memory/SKILL.md)
+and [worker-handoff](skills/worker-handoff/SKILL.md) skills. They are model-followed
+workflows, not background automation. No new database or MCP service is required.
+Workers supply reports; the coordinator owns acceptance and the shared briefing.
+Keep one coordinator writer per notes root. Busy/missing workers are recorded as
+missing updates, not silently treated as complete.
+
+Configure each machine separately, outside this repository, using
+`~/.config/coordinator-memory/config.json`:
+
+```json
+{"notes_dir": "~/notes/raw/captures/coordinator"}
+```
+
+Choose the actual vault path on that machine. `COORDINATOR_NOTES_DIR` overrides
+this setting for a particular environment. Missing config is an error, not an
+invitation to guess a directory. Personal/work machines share the skills, not the
+notes. Python 3 is required for path resolution.
+
+The root contains a living `briefing.md`, dated `daily/YYYY-MM-DD.md` logs, and
+`workers/<unique-assignment-id>.md` reports. Start with `/wrap-up` in a session that
+already has context to seed the briefing. Use `/catch-up` in a fresh coordinator;
+there is no automatic startup injection or scheduled session replacement. Run
+`./bootstrap.sh` and `/reload` in Pi to discover the commands after installation.
+
 ## Herdr
 
 Install [Herdr](https://herdr.dev) separately (config verified with 0.8.2), then run `npm run sync` or `./bootstrap.sh` from your permanent checkout. Only `config.toml` is managed, not the whole Herdr directory. Existing config files or links are backed up before replacement; review your personal differences with `npm run sync:dry-run` first. The config keeps Ctrl+A, Cmd+Shift+[ / ] tab switching, Ctrl+N new tab, Cmd+Shift+N vertical split, symbol status indicators, in-Herdr notifications, and the official Catppuccin Frappé palette. Pi's Ctrl+A bindings are freed for Herdr, while its personal paste-image shortcuts remain.
