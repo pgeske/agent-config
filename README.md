@@ -61,7 +61,7 @@ npm run sync:dry-run
 - Pi uses native compaction, including its default model/summary behavior and token thresholds. `compact-footer` is UI-only and remains installed.
 - `/handoff` writes a self-contained session handoff into the notes vault.
 - `/config-sync` reapplies the managed machine configuration.
-- MCP adapter, Peekaboo macOS computer use, autocomplete layout, Codex image generation, voice bridge, tmux notification, Excalidraw, and Codex review extensions are included.
+- MCP adapter, Peekaboo macOS computer use, autocomplete layout, Codex image generation, voice bridge, Excalidraw, and Codex review extensions are included.
 
 Stable Pi is pinned to `0.84.1`. The experimental Pi source is pinned to commit [`28657a2ffa6dbeccba74c166682e7a7ee547f5b4`](https://github.com/badlogic/pi-mono/commit/28657a2ffa6dbeccba74c166682e7a7ee547f5b4) and built under `~/.pi/experimental/pi-main-28657a2`.
 

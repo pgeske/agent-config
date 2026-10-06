@@ -187,7 +187,7 @@ tmux_conf_theme_terminal_title="#h ❐ #S ● #I #W"
 tmux_conf_theme_window_status_fg="#c6d0f5"
 tmux_conf_theme_window_status_bg="#51576d"
 tmux_conf_theme_window_status_attr="none,underscore,us=#737994"
-tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}#{?@pi_notify_label, #{@pi_notify_label},}"
+tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
 #tmux_conf_theme_window_status_format="#{circled_window_index} #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
 #tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,🔔,}#{?window_zoomed_flag,🔍,}"
 
@@ -204,18 +204,18 @@ tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_
 tmux_conf_theme_window_status_current_fg="#303446"
 tmux_conf_theme_window_status_current_bg="#8caaee"
 tmux_conf_theme_window_status_current_attr="bold,underscore,us=#737994"
-tmux_conf_theme_window_status_current_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}#{?@pi_notify_label, #{@pi_notify_label},}"
+tmux_conf_theme_window_status_current_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
 #tmux_conf_theme_window_status_current_format="#{circled_window_index} #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
 #tmux_conf_theme_window_status_current_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,🔔,}#{?window_zoomed_flag,🔍,}"
 
-# Keep inactive tabs visually stable when they become last-used or report activity.
+# Keep inactive tabs visually stable when they become last-used, report
+# activity, or ring the bell (agents ring it when they finish).
 tmux_conf_theme_window_status_activity_fg="#c6d0f5"
 tmux_conf_theme_window_status_activity_bg="#51576d"
 tmux_conf_theme_window_status_activity_attr="default"
 
-# window bell status style
-tmux_conf_theme_window_status_bell_fg="#303446"
-tmux_conf_theme_window_status_bell_bg="#e5c890"
+tmux_conf_theme_window_status_bell_fg="#c6d0f5"
+tmux_conf_theme_window_status_bell_bg="#51576d"
 tmux_conf_theme_window_status_bell_attr="default"
 
 # The last-used tab should look like every other inactive tab.
@@ -524,8 +524,7 @@ bind -n WheelDownPane if-shell -Ft= "#{mouse_any_flag}" "send-keys -M" "send-key
 
 # Plugin Management
 # Disabled: dracula/tmux was flattening the window-status theme in new tmux
-# sessions and racing the Pi tmux notification installer. Keep Pi notifications
-# via the delayed tmux-notify install below instead.
+# sessions.
 # set -g @plugin 'tmux-plugins/tpm'
 # set -g @plugin 'dracula/tmux'
 # set -g @dracula-plugins "battery time network"
@@ -534,8 +533,8 @@ bind -n WheelDownPane if-shell -Ft= "#{mouse_any_flag}" "send-keys -M" "send-key
 # Keep the tmux chrome consistent with Pi's Catppuccin Frappé palette.
 # Use a darker mantle ribbon and subtle surface border so the top status row
 # reads as intentional chrome even where there are no window tabs.
-# These explicit overrides must stay after the theme template and notification
-# hooks so newly created windows use the same styling as existing ones.
+# These explicit overrides must stay after the theme template so newly created
+# windows use the same styling as existing ones.
 set-option -g message-style 'fg=#080808,bg=#ffff00,bold'
 set-option -g message-command-style 'fg=#ffff00,bg=#080808,bold'
 set-window-option -g mode-style 'fg=#303446,bg=#8caaee,bold'
@@ -561,15 +560,37 @@ set-window-option -g window-status-style 'fg=#c6d0f5,bg=#51576d,none,underscore,
 set-window-option -g window-status-current-style 'fg=#303446,bg=#8caaee,bold,underscore,us=#737994'
 set-window-option -g window-status-activity-style 'fg=#c6d0f5,bg=#51576d,none,underscore,us=#737994'
 set-window-option -g window-status-last-style 'fg=#c6d0f5,bg=#51576d,none,underscore,us=#737994'
-set-window-option -g window-status-bell-style 'fg=#303446,bg=#e5c890,bold,underscore,us=#737994'
-# Keep tabs at a Chrome-like fixed 20-cell width. Reserve two cells for Pi
-# status so notification changes cannot resize a tab.
-set-window-option -g window-status-format ' #{=/14/…;p15:#{window_name}} #{=2;p2:#{@pi_notify_label}}#[fg=#737994]▕'
-set-window-option -g window-status-current-format ' #{=/14/…;p15:#{window_name}} #{=2;p2:#{@pi_notify_label}}#[fg=#737994]▕'
+# The bell only flags a tab; window-status-format below decides how it looks.
+set-window-option -g window-status-bell-style 'fg=#c6d0f5,bg=#51576d,none,underscore,us=#737994'
+
+# Every tab ends with a one-cell omp status mark, just before its divider:
+#   ○ working  - omp titles its pane "π <spinner> <session>" while it works,
+#                "π > ..." when idle, and "π ! ..." when it's waiting on you.
+#   ● done     - green until you open the tab. omp rings the bell when a turn
+#                ends or it asks a question; tmux flags the tab while you're
+#                elsewhere and clears the flag when you visit it.
+#   (blank)    - idle and already seen.
+# Working wins over done, so a tab that resumed work shows the ring again. The
+# tab you're on never shows the dot: being on it counts as having seen it.
+# A tmux server started from inside Herdr keeps that Herdr pane's identity in
+# its global environment. omp then notifies Herdr instead of ringing the bell,
+# so the done dot never shows. tmux is the multiplexer here, so drop it.
+set-environment -gu HERDR_ENV
+set-environment -gu HERDR_PANE_ID
+set-environment -gu HERDR_TAB_ID
+set-environment -gu HERDR_WORKSPACE_ID
+set-environment -gu HERDR_SOCKET_PATH
+set-window-option -g monitor-bell on
+set-option -g bell-action none  # keep the tab flag, never beep
+set-option -g @omp_working '#{P:#{?#{m/r:^π [^ >!]+( |$),#{pane_title}},1,}}'
+set-option -g @omp_status '#{?#{E:@omp_working},○,#{?#{&&:#{window_bell_flag},#{!:#{window_active}}},#[fg=#a6d189]●, }}'
+# Keep tabs at a Chrome-like fixed 20-cell width, including the status mark.
+set-window-option -g window-status-format ' #{=/15/…;p16:#{window_name}} #{E:@omp_status}#[fg=#737994]▕'
+set-window-option -g window-status-current-format ' #{=/15/…;p16:#{window_name}} #{E:@omp_status}#[fg=#737994]▕'
 
 # Easier mobile-friendly window selector: prefix (Ctrl-a or Ctrl-b) then k.
-# Show only window names plus Pi notification status in the chooser.
-bind-key k choose-tree -Zw -F '#{window_name}#{?@pi_notify_label, #{@pi_notify_label},}'
+# Show only window names and the omp status mark in the chooser.
+bind-key k choose-tree -Zw -F '#{window_name} #{E:@omp_status}'
 
 # Ctrl-N (no prefix) opens a new window running omp in the current pane's directory.
 # #!important stops Oh my tmux from stripping -c via tmux_conf_new_window_retain_current_path.
