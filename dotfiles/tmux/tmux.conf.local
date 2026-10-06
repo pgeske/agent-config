@@ -571,3 +571,7 @@ set-window-option -g window-status-current-format ' #{=/14/…;p15:#{window_name
 # Show only window names plus Pi notification status in the chooser.
 bind-key k choose-tree -Zw -F '#{window_name}#{?@pi_notify_label, #{@pi_notify_label},}'
 
+# Ctrl-N (no prefix) opens a new window running omp in the current pane's directory.
+# #!important stops Oh my tmux from stripping -c via tmux_conf_new_window_retain_current_path.
+bind -n C-n new-window -c '#{pane_current_path}' omp #!important
+
