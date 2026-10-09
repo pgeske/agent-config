@@ -1,16 +1,11 @@
 skill_targets:
-  - ~/.openclaw/workspace/skills
-  - ~/.opencode/skills
   - ~/.config/opencode/skills
   - ~/.claude/skills
   - ~/.agents/skills
-  - ~/.pi/agent/skills
+  - ~/.omp/agent/skills
 
 agents_targets:
   - ~/.config/opencode/AGENTS.md
   - ~/.claude/CLAUDE.md
   - ~/.codex/AGENTS.md
-  - ~/.pi/agent/AGENTS.md
-
-extension_targets:
-  - ~/.pi/agent/extensions
+  - ~/.omp/agent/AGENTS.md

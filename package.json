@@ -2,21 +2,14 @@
   "name": "agent-config",
   "version": "0.1.0",
   "private": true,
-  "description": "Shared agent configuration, reusable skills, and Pi extensions.",
+  "description": "Shared agent instructions, skills, and machine configuration.",
   "type": "module",
   "scripts": {
     "bootstrap": "./bootstrap.sh",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx tests/*.test.ts && python3 -m unittest discover -s skills/autoreview/scripts -p 'test_*.py'",
+    "test": "node --test --import tsx tests/*.test.ts && bash tests/install.sh",
     "sync": "node scripts/sync.mjs",
-    "sync:dry-run": "node scripts/sync.mjs --dry-run",
-    "install:experimental-pi": "node scripts/install-experimental-pi.mjs"
-  },
-  "dependencies": {
-    "@earendil-works/pi-ai": "^0.84.1",
-    "@earendil-works/pi-coding-agent": "^0.84.1",
-    "@earendil-works/pi-tui": "^0.84.1",
-    "@pgeske/mac-computer-use-mcp": "https://github.com/pgeske/mac-computer-use-mcp/releases/download/v0.4.0/pgeske-mac-computer-use-mcp-0.4.0.tgz"
+    "sync:dry-run": "node scripts/sync.mjs --dry-run"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

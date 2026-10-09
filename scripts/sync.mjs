@@ -3,8 +3,6 @@ import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { isDeepStrictEqual } from "node:util";
-import { pruneExtensionLinks } from "./prune-extension-links.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
@@ -12,7 +10,7 @@ const repoRoot = path.resolve(path.dirname(scriptPath), "..");
 const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+$/, "");
 
 function usage() {
-  return `Usage: node scripts/sync.mjs [options]\n\nSync this agent-config repo into a machine profile. Safe to rerun.\n\nOptions:\n  --dry-run                 Print planned actions without changing files\n  --home <path>             Home directory to sync into (default: current user home)\n  --config-home <path>      XDG config dir (default: $XDG_CONFIG_HOME or <home>/.config)\n  --pi-agent-dir <path>     Pi agent dir (default: $PI_CODING_AGENT_DIR or <home>/.pi/agent)\n  --mode <auto|symlink|copy>  Install mode (default: auto; copy on Windows, symlink elsewhere)\n  --no-backup               Replace existing targets without writing .bak-* backups\n  --help                    Show this help\n`;
+  return `Usage: node scripts/sync.mjs [options]\n\nSync this agent-config repo into a machine profile. Safe to rerun.\n\nOptions:\n  --dry-run                 Print planned actions without changing files\n  --home <path>             Home directory to sync into (default: current user home)\n  --config-home <path>      XDG config dir (default: $XDG_CONFIG_HOME or <home>/.config)\n  --mode <auto|symlink|copy>  Install mode (default: auto; copy on Windows, symlink elsewhere)\n  --no-backup               Replace existing targets without writing .bak-* backups\n  --help                    Show this help\n`;
 }
 
 function parseArgs(argv) {
@@ -20,7 +18,6 @@ function parseArgs(argv) {
     dryRun: false,
     home: os.homedir(),
     configHome: undefined,
-    piAgentDir: undefined,
     mode: "auto",
     backup: true,
   };
@@ -39,9 +36,6 @@ function parseArgs(argv) {
         break;
       case "--config-home":
         options.configHome = requireValue(argv, ++i, arg);
-        break;
-      case "--pi-agent-dir":
-        options.piAgentDir = requireValue(argv, ++i, arg);
         break;
       case "--mode":
         options.mode = requireValue(argv, ++i, arg);
@@ -62,7 +56,6 @@ function parseArgs(argv) {
   options.home = resolveUserPath(options.home, currentHome);
   options.configHome = resolveUserPath(options.configHome ?? process.env.XDG_CONFIG_HOME ?? path.join(options.home, ".config"), options.home);
   options.localAppData = resolveUserPath(defaultLocalAppData(options.home, currentHome), options.home);
-  options.piAgentDir = resolveUserPath(options.piAgentDir ?? process.env.PI_CODING_AGENT_DIR ?? path.join(options.home, ".pi", "agent"), options.home);
   if (options.mode === "auto") options.mode = process.platform === "win32" ? "copy" : "symlink";
   return options;
 }
@@ -107,36 +100,6 @@ function managedItems(options) {
       target: path.join(options.configHome, "herdr", "config.toml"),
     },
     {
-      label: "Pi AGENTS.md",
-      type: "file",
-      source: path.join(repoRoot, "AGENTS.md"),
-      target: path.join(options.piAgentDir, "AGENTS.md"),
-    },
-    {
-      label: "Pi settings overlay",
-      type: "json-merge",
-      source: path.join(repoRoot, "dotfiles", "pi", "settings.json"),
-      target: path.join(options.piAgentDir, "settings.json"),
-    },
-    {
-      label: "Pi themes",
-      type: "dir",
-      source: path.join(repoRoot, "dotfiles", "pi", "themes"),
-      target: path.join(options.piAgentDir, "themes"),
-    },
-    {
-      label: "Pi keybindings",
-      type: "file",
-      source: path.join(repoRoot, "dotfiles", "pi", "keybindings.json"),
-      target: path.join(options.piAgentDir, "keybindings.json"),
-    },
-    {
-      label: "Pi web-search config",
-      type: "file",
-      source: path.join(repoRoot, "dotfiles", "pi", "web-search.json"),
-      target: path.join(options.home, ".pi", "web-search.json"),
-    },
-    {
       label: "tmux config",
       type: "file",
       source: path.join(repoRoot, "dotfiles", "tmux", "tmux.conf"),
@@ -163,15 +126,6 @@ function managedItems(options) {
     },
   ];
 
-  if (process.platform === "darwin") {
-    items.push({
-      label: "Shared MCP config",
-      type: "file",
-      source: path.join(repoRoot, "dotfiles", "mcp", "mcp.json"),
-      target: path.join(options.configHome, "mcp", "mcp.json"),
-    });
-  }
-
   if (process.platform !== "win32") {
     items.push(
       {
@@ -187,22 +141,10 @@ function managedItems(options) {
         target: path.join(options.home, ".local", "bin", "deploy-filmstream"),
       },
       {
-        label: "Pi launcher",
+        label: "OMP launcher",
         type: "file",
-        source: path.join(repoRoot, "dotfiles", "pi", "bin", "pi"),
-        target: path.join(options.piAgentDir, "bin", "pi"),
-      },
-      {
-        label: "Stable Pi launcher",
-        type: "file",
-        source: path.join(repoRoot, "dotfiles", "pi", "bin", "pi-stable"),
-        target: path.join(options.piAgentDir, "bin", "pi-stable"),
-      },
-      {
-        label: "Experimental Pi launcher",
-        type: "file",
-        source: path.join(repoRoot, "dotfiles", "pi", "bin", "pi-experimental"),
-        target: path.join(options.home, ".local", "bin", "pi-experimental"),
+        source: path.join(repoRoot, "dotfiles", "omp", "bin", "omp"),
+        target: path.join(options.home, ".local", "bin", "omp"),
       },
     );
   }
@@ -275,59 +217,9 @@ async function safeLstat(p) {
   }
 }
 
-async function readJson(target) {
-  try {
-    return JSON.parse(await fs.readFile(target, "utf8"));
-  } catch (error) {
-    throw new Error(`Unable to read JSON from ${target}: ${error.message}`);
-  }
-}
-
-function mergeJson(current, overlay, parentKey = "") {
-  if (Array.isArray(current) && Array.isArray(overlay)) {
-    const merged = [...current];
-    for (const value of overlay) {
-      if (parentKey === "packages" && value && typeof value === "object" && typeof value.source === "string") {
-        const existingIndexes = merged
-          .map((existing, index) => existing === value.source || existing?.source === value.source ? index : -1)
-          .filter((index) => index >= 0);
-        if (existingIndexes.length > 0) {
-          merged[existingIndexes[0]] = value;
-          for (let index = existingIndexes.length - 1; index > 0; index -= 1) {
-            merged.splice(existingIndexes[index], 1);
-          }
-          continue;
-        }
-      }
-      if (!merged.some((existing) => isDeepStrictEqual(existing, value))) merged.push(value);
-    }
-    return merged;
-  }
-  if (current && overlay && typeof current === "object" && typeof overlay === "object" && !Array.isArray(current) && !Array.isArray(overlay)) {
-    const merged = { ...current };
-    for (const [key, value] of Object.entries(overlay)) {
-      merged[key] = key in current ? mergeJson(current[key], value, key) : value;
-    }
-    return merged;
-  }
-  return overlay;
-}
-
-// Keep unrelated local choices while returning compaction to native defaults.
-function mergePiSettings(current, overlay) {
-  const settings = mergeJson(current, overlay);
-  delete settings.compaction;
-  return settings;
-}
-
 async function targetIsCurrent(item, mode) {
   const targetStat = await safeLstat(item.target);
   if (!targetStat) return false;
-
-  if (item.type === "json-merge") {
-    const [current, overlay] = await Promise.all([readJson(item.target), readJson(item.source)]);
-    return isDeepStrictEqual(current, mergePiSettings(current, overlay));
-  }
 
   if (mode === "symlink") {
     if (!targetStat.isSymbolicLink()) return false;
@@ -354,9 +246,6 @@ async function backupTarget(target) {
 
 async function replaceTarget(item, options) {
   const exists = await pathExists(item.target);
-  const mergedJson = item.type === "json-merge"
-    ? mergePiSettings(exists ? await readJson(item.target) : {}, await readJson(item.source))
-    : null;
   let backupPath = null;
 
   if (exists) {
@@ -368,9 +257,7 @@ async function replaceTarget(item, options) {
   }
 
   await fs.mkdir(path.dirname(item.target), { recursive: true });
-  if (item.type === "json-merge") {
-    await fs.writeFile(item.target, `${JSON.stringify(mergedJson, null, 2)}\n`);
-  } else if (options.mode === "copy") {
+  if (options.mode === "copy") {
     if (item.type === "dir") {
       await fs.cp(item.source, item.target, { recursive: true, force: true, errorOnExist: false });
     } else {
@@ -387,16 +274,6 @@ async function replaceTarget(item, options) {
 async function sync(options) {
   const items = managedItems(options);
   const results = [];
-  const staleLinks = await pruneExtensionLinks(
-    path.join(repoRoot, "extensions"), path.join(options.piAgentDir, "extensions"), options,
-  );
-  for (const target of staleLinks) {
-    results.push({
-      item: { label: "Retired Pi extension link", target },
-      action: "remove",
-      detail: options.dryRun ? "would remove owned dangling link" : "removed owned dangling link",
-    });
-  }
 
   for (const item of items) {
     if (!(await pathExists(item.source))) {
@@ -415,8 +292,7 @@ async function sync(options) {
     const exists = await pathExists(item.target);
     const action = exists ? "replace" : "create";
     if (options.dryRun) {
-      const method = item.type === "json-merge" ? "merge" : options.mode;
-      results.push({ item, action, detail: `${method}${exists && options.backup ? ", backup first" : ""}` });
+      results.push({ item, action, detail: `${options.mode}${exists && options.backup ? ", backup first" : ""}` });
       continue;
     }
 
@@ -431,7 +307,7 @@ function renderResults(results, options) {
   const lines = [];
   lines.push(`${options.dryRun ? "Dry run" : "Sync complete"} (${options.mode})`);
   for (const result of results) {
-    const prefix = { ok: "=", create: "+", replace: "~", skip: "-", remove: "-" }[result.action] ?? "?";
+    const prefix = { ok: "=", create: "+", replace: "~", skip: "-" }[result.action] ?? "?";
     lines.push(`${prefix} ${result.item.label}: ${result.item.target} (${result.detail})`);
   }
   return lines.join("\n");

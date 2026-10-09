@@ -3,8 +3,6 @@ set -euo pipefail
 
 ROOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 SKILLS_DIR="$ROOT_DIR/skills"
-EXTENSIONS_DIR="$ROOT_DIR/extensions"
-COMMANDS_DIR="$ROOT_DIR/commands"
 TARGETS_FILE="$ROOT_DIR/targets.yaml"
 AGENTS_SOURCE="$ROOT_DIR/AGENTS.md"
 
@@ -12,7 +10,7 @@ usage() {
   cat <<'EOF'
 Usage: ./install.sh [--force] [--prune] [skill ...]
 
-Install managed skills, Pi extensions, and shared agent config.
+Install managed skills and shared AGENTS.md into supported agents.
 
 Options:
   --force  Replace existing files or directories for symlink-based targets
@@ -65,7 +63,6 @@ load_targets() {
       case "${BASH_REMATCH[1]}" in
         targets|skill_targets) current_section="skill_targets" ;;
         agents_targets) current_section="agents_targets" ;;
-        extension_targets|extensions_targets) current_section="extension_targets" ;;
         *) current_section="" ;;
       esac
       continue
@@ -76,23 +73,9 @@ load_targets() {
       case "$current_section" in
         skill_targets) skill_targets+=("$raw_target") ;;
         agents_targets) agents_targets+=("$raw_target") ;;
-        extension_targets) extension_targets+=("$raw_target") ;;
       esac
     fi
   done < "$TARGETS_FILE"
-}
-
-install_mode_for_target() {
-  local target="$1"
-  local openclaw_workspace_skills
-
-  openclaw_workspace_skills=$(expand_path "~/.openclaw/workspace/skills")
-
-  if [[ "$target" == "$openclaw_workspace_skills" ]]; then
-    printf 'copy\n'
-  else
-    printf 'symlink\n'
-  fi
 }
 
 force=0
@@ -140,7 +123,6 @@ fi
 
 skill_targets=()
 agents_targets=()
-extension_targets=()
 load_targets
 
 if [[ ${#skill_targets[@]} -eq 0 ]]; then
@@ -228,15 +210,8 @@ printf 'Installing %s skill(s): %s\n' "${#skills[@]}" "$(printf '%s ' "${skills[
 for target in "${skill_targets[@]}"; do
   printf '\n==> %s\n' "$target"
 
-  install_mode=$(install_mode_for_target "$target")
-
-  resolved_target=""
-  if [[ -e "$target" || -L "$target" ]]; then
-    resolved_target=$(readlink -f "$target" || true)
-  fi
-
-  if [[ "$install_mode" == "symlink" && -L "$target" ]]; then
-    if [[ "$resolved_target" == "$skills_root" ]]; then
+  if [[ -L "$target" ]]; then
+    if [[ $(readlink -f "$target" || true) == "$skills_root" ]]; then
       printf '  = target already points to registry skills (%s -> %s); skipping\n' "$target" "$skills_root"
       skipped=$((skipped + ${#skills[@]}))
       continue
@@ -273,174 +248,10 @@ for target in "${skill_targets[@]}"; do
   fi
 
   for skill in "${skills[@]}"; do
-    src="$SKILLS_DIR/$skill"
-    dst="$target/$skill"
-
-    if [[ -e "$dst" || -L "$dst" ]]; then
-      if [[ "$install_mode" == "symlink" && -L "$dst" ]] && [[ $(readlink -f "$dst" || true) == "$src" ]]; then
-        skipped=$((skipped + 1))
-        continue
-      fi
-
-      if [[ "$install_mode" == "copy" ]]; then
-        rm -rf "$dst"
-        updated=$((updated + 1))
-      elif [[ $force -ne 1 ]]; then
-        printf '  ! exists (use --force to replace): %s\n' "$dst"
-        skipped=$((skipped + 1))
-        continue
-      else
-        rm -rf "$dst"
-        updated=$((updated + 1))
-      fi
-    else
-      created=$((created + 1))
-    fi
-
-    if [[ "$install_mode" == "copy" ]]; then
-      cp -a "$src" "$dst"
-      printf '  copied %s -> %s\n' "$src" "$dst"
-    else
-      ln -s "$src" "$dst"
-      printf '  linked %s -> %s\n' "$dst" "$src"
-    fi
+    # A conflicting unmanaged skill is reported and left alone; --force replaces it.
+    install_managed_symlink "$SKILLS_DIR/$skill" "$target/$skill" || skipped=$((skipped + 1))
   done
 done
-
-if [[ -d "$EXTENSIONS_DIR" && ${#extension_targets[@]} -gt 0 ]]; then
-  extensions_root=$(readlink -f "$EXTENSIONS_DIR")
-  extension_paths=()
-  shopt -s nullglob
-  for extension_path in "$EXTENSIONS_DIR"/*; do
-    if [[ -d "$extension_path" && -f "$extension_path/index.ts" ]]; then
-      extension_paths+=("$extension_path")
-    elif [[ -f "$extension_path" && "$extension_path" == *.ts ]]; then
-      extension_paths+=("$extension_path")
-    fi
-  done
-  shopt -u nullglob
-
-  if [[ ${#extension_paths[@]} -gt 0 ]]; then
-    printf '\nInstalling %s extension(s)\n' "${#extension_paths[@]}"
-  fi
-
-  contains_extension() {
-    local needle="$1"
-    local extension_path
-    for extension_path in "${extension_paths[@]}"; do
-      if [[ "$(basename "$extension_path")" == "$needle" ]]; then
-        return 0
-      fi
-    done
-    return 1
-  }
-
-  for extension_target in "${extension_targets[@]}"; do
-    printf '\n==> %s\n' "$extension_target"
-
-    if [[ -L "$extension_target" ]]; then
-      if [[ $force -ne 1 ]]; then
-        printf '  ! target root is a symlink (use --force to replace): %s\n' "$extension_target" >&2
-        exit 1
-      fi
-      rm -f "$extension_target"
-    fi
-
-    mkdir -p "$extension_target"
-
-    # Always retire deleted resources, including dangling links, without --prune.
-    node "$ROOT_DIR/scripts/prune-extension-links.mjs" "$EXTENSIONS_DIR" "$extension_target"
-
-    if [[ -d "$ROOT_DIR/node_modules" ]]; then
-      if [[ -e "$extension_target/node_modules" || -L "$extension_target/node_modules" ]]; then
-        if [[ -L "$extension_target/node_modules" ]] && [[ $(readlink -f "$extension_target/node_modules" || true) == "$ROOT_DIR/node_modules" ]]; then
-          skipped=$((skipped + 1))
-        elif [[ $force -ne 1 ]]; then
-          printf '  ! exists (use --force to replace): %s\n' "$extension_target/node_modules" >&2
-          exit 1
-        else
-          rm -rf "$extension_target/node_modules"
-          ln -s "$ROOT_DIR/node_modules" "$extension_target/node_modules"
-          printf '  linked %s -> %s\n' "$extension_target/node_modules" "$ROOT_DIR/node_modules"
-          updated=$((updated + 1))
-        fi
-      else
-        ln -s "$ROOT_DIR/node_modules" "$extension_target/node_modules"
-        printf '  linked %s -> %s\n' "$extension_target/node_modules" "$ROOT_DIR/node_modules"
-        created=$((created + 1))
-      fi
-    else
-      printf '  ! extension dependencies not installed; run npm install in %s before starting Pi with these extensions\n' "$ROOT_DIR" >&2
-    fi
-
-    if [[ $prune -eq 1 ]]; then
-      shopt -s nullglob
-      for child in "$extension_target"/*; do
-        name=$(basename "$child")
-        if [[ "$name" == .* ]] || contains_extension "$name"; then
-          continue
-        fi
-
-        if [[ -L "$child" ]]; then
-          resolved_child=$(readlink -f "$child" || true)
-          if [[ "$resolved_child" == "$extensions_root"/* ]]; then
-            rm -f "$child"
-            printf '  pruned stale extension link: %s\n' "$child"
-          fi
-        fi
-      done
-      shopt -u nullglob
-    fi
-
-    for extension_path in "${extension_paths[@]}"; do
-      name=$(basename "$extension_path")
-      src="$extension_path"
-      dst="$extension_target/$name"
-
-      if [[ -e "$dst" || -L "$dst" ]]; then
-        if [[ -L "$dst" ]] && [[ $(readlink -f "$dst" || true) == "$src" ]]; then
-          skipped=$((skipped + 1))
-          continue
-        fi
-
-        if [[ $force -ne 1 ]]; then
-          printf '  ! exists (use --force to replace): %s\n' "$dst" >&2
-          exit 1
-        fi
-
-        rm -rf "$dst"
-        updated=$((updated + 1))
-      else
-        created=$((created + 1))
-      fi
-
-      ln -s "$src" "$dst"
-      printf '  linked %s -> %s\n' "$dst" "$src"
-    done
-  done
-fi
-
-if [[ -d "$COMMANDS_DIR" ]]; then
-  shopt -s nullglob
-  command_files=("$COMMANDS_DIR"/*.md)
-  shopt -u nullglob
-
-  if [[ ${#command_files[@]} -gt 0 ]]; then
-    printf '\nInstalling %s command(s)\n' "${#command_files[@]}"
-  fi
-
-  for command_file in "${command_files[@]}"; do
-    command_name=$(basename "$command_file")
-    for command_target in \
-      "$HOME/.config/opencode/commands/$command_name" \
-      "$HOME/.claude/commands/$command_name" \
-      "$HOME/.pi/agent/prompts/$command_name"; do
-      if ! install_managed_symlink "$command_file" "$command_target"; then
-        exit 1
-      fi
-    done
-  done
-fi
 
 for agents_target in "${agents_targets[@]}"; do
   printf '\n==> %s\n' "$agents_target"

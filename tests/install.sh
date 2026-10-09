@@ -35,7 +35,7 @@ assert_symlink_target() {
   }
 }
 
-test_install_all_creates_opencode_agents_symlink() (
+test_install_all_links_skills_and_agents() (
   local home_dir
   home_dir=$(mktemp -d)
   trap 'rm -rf "$home_dir"' EXIT
@@ -45,178 +45,43 @@ test_install_all_creates_opencode_agents_symlink() (
   assert_symlink_target \
     "$home_dir/.config/opencode/AGENTS.md" \
     "$ROOT_DIR/AGENTS.md"
-
   assert_symlink_target \
-    "$home_dir/.pi/agent/AGENTS.md" \
+    "$home_dir/.omp/agent/AGENTS.md" \
     "$ROOT_DIR/AGENTS.md"
-
   assert_symlink_target \
-    "$home_dir/.pi/agent/skills/sync-agent-config" \
-    "$ROOT_DIR/skills/sync-agent-config"
-
+    "$home_dir/.omp/agent/skills/herdr" \
+    "$ROOT_DIR/skills/herdr"
   assert_symlink_target \
-    "$home_dir/.pi/agent/prompts/sync-agent-config.md" \
-    "$ROOT_DIR/commands/sync-agent-config.md"
+    "$home_dir/.claude/skills/agent-config-workflow" \
+    "$ROOT_DIR/skills/agent-config-workflow"
+  [[ ! -e "$home_dir/.pi" ]]
+  [[ ! -e "$home_dir/.omp/agent/extensions" ]]
+  [[ ! -e "$home_dir/.omp/agent/models.yml" ]]
+  [[ ! -e "$home_dir/.omp/agent/agent.db" ]]
+
+  # Reruns must preserve machine-local OMP settings and credentials.
+  printf 'local settings\n' > "$home_dir/.omp/agent/config.yml"
+  printf 'local credentials\n' > "$home_dir/.omp/agent/agent.db"
+  run_install "$home_dir"
+  [[ $(< "$home_dir/.omp/agent/config.yml") == 'local settings' ]]
+  [[ $(< "$home_dir/.omp/agent/agent.db") == 'local credentials' ]]
 )
 
-test_named_gather_context_install_still_installs_agents() (
+test_named_skill_install_still_installs_agents() (
   local home_dir
 
   home_dir=$(mktemp -d)
   trap 'rm -rf "$home_dir"' EXIT
 
-  run_install "$home_dir" gather-context
+  run_install "$home_dir" herdr
 
   assert_symlink_target \
     "$home_dir/.config/opencode/AGENTS.md" \
     "$ROOT_DIR/AGENTS.md"
-
   assert_symlink_target \
-    "$home_dir/.config/opencode/skills/gather-context" \
-    "$ROOT_DIR/skills/gather-context"
-)
-
-test_install_all_installs_pi_extensions() (
-  local home_dir
-
-  home_dir=$(mktemp -d)
-  trap 'rm -rf "$home_dir"' EXIT
-
-  run_install "$home_dir"
-
-  assert_symlink_target \
-    "$home_dir/.pi/agent/extensions/compact-footer" \
-    "$ROOT_DIR/extensions/compact-footer"
-
-  assert_symlink_target \
-    "$home_dir/.pi/agent/extensions/excalidraw.ts" \
-    "$ROOT_DIR/extensions/excalidraw.ts"
-
-  assert_symlink_target \
-    "$home_dir/.pi/agent/extensions/codex-review.ts" \
-    "$ROOT_DIR/extensions/codex-review.ts"
-
-  if [[ -d "$ROOT_DIR/node_modules" ]]; then
-    assert_symlink_target \
-      "$home_dir/.pi/agent/extensions/node_modules" \
-      "$ROOT_DIR/node_modules"
-  fi
-)
-
-test_extension_conflict_requires_force() (
-  local home_dir
-  local output
-
-  home_dir=$(mktemp -d)
-  trap 'rm -rf "$home_dir"' EXIT
-
-  mkdir -p "$home_dir/.pi/agent/extensions/compact-footer"
-  printf 'local-only\n' > "$home_dir/.pi/agent/extensions/compact-footer/index.ts"
-
-  if output=$(run_install "$home_dir" 2>&1); then
-    printf 'expected install to fail without --force\n' >&2
-    return 1
-  fi
-
-  case "$output" in
-    *"exists (use --force to replace): $home_dir/.pi/agent/extensions/compact-footer"*)
-      ;;
-    *)
-      printf 'unexpected error output:\n%s\n' "$output" >&2
-      return 1
-      ;;
-  esac
-
-  run_install "$home_dir" --force >/dev/null
-
-  assert_symlink_target \
-    "$home_dir/.pi/agent/extensions/compact-footer" \
-    "$ROOT_DIR/extensions/compact-footer"
-)
-
-test_extension_file_conflict_requires_force() (
-  local home_dir
-  local output
-
-  home_dir=$(mktemp -d)
-  trap 'rm -rf "$home_dir"' EXIT
-
-  mkdir -p "$home_dir/.pi/agent/extensions"
-  printf 'local-only\n' > "$home_dir/.pi/agent/extensions/excalidraw.ts"
-
-  if output=$(run_install "$home_dir" 2>&1); then
-    printf 'expected install to fail without --force\n' >&2
-    return 1
-  fi
-
-  case "$output" in
-    *"exists (use --force to replace): $home_dir/.pi/agent/extensions/excalidraw.ts"*)
-      ;;
-    *)
-      printf 'unexpected error output:\n%s\n' "$output" >&2
-      return 1
-      ;;
-  esac
-
-  run_install "$home_dir" --force >/dev/null
-
-  assert_symlink_target \
-    "$home_dir/.pi/agent/extensions/excalidraw.ts" \
-    "$ROOT_DIR/extensions/excalidraw.ts"
-)
-
-test_extension_target_root_symlink_requires_force() (
-  local home_dir
-  local output
-
-  home_dir=$(mktemp -d)
-  trap 'rm -rf "$home_dir"' EXIT
-
-  mkdir -p "$home_dir/.pi/agent" "$home_dir/extension-target"
-  ln -s "$home_dir/extension-target" "$home_dir/.pi/agent/extensions"
-
-  if output=$(run_install "$home_dir" 2>&1); then
-    printf 'expected install to fail without --force\n' >&2
-    return 1
-  fi
-
-  case "$output" in
-    *"target root is a symlink (use --force to replace): $home_dir/.pi/agent/extensions"*)
-      ;;
-    *)
-      printf 'unexpected error output:\n%s\n' "$output" >&2
-      return 1
-      ;;
-  esac
-
-  run_install "$home_dir" --force >/dev/null
-
-  [[ -d "$home_dir/.pi/agent/extensions" && ! -L "$home_dir/.pi/agent/extensions" ]] || {
-    printf 'expected extension target root to be a real directory\n' >&2
-    return 1
-  }
-
-  assert_symlink_target \
-    "$home_dir/.pi/agent/extensions/compact-footer" \
-    "$ROOT_DIR/extensions/compact-footer"
-)
-
-test_prune_removes_stale_extension_links() (
-  local home_dir
-
-  home_dir=$(mktemp -d)
-  trap 'rm -rf "$home_dir" "$ROOT_DIR/extensions/.stale-test"' EXIT
-
-  mkdir -p "$home_dir/.pi/agent/extensions" "$ROOT_DIR/extensions/.stale-test/old-extension"
-  touch "$ROOT_DIR/extensions/.stale-test/old-extension/index.ts"
-  ln -s "$ROOT_DIR/extensions/.stale-test/old-extension" "$home_dir/.pi/agent/extensions/old-extension"
-
-  run_install "$home_dir" --prune >/dev/null
-
-  [[ ! -e "$home_dir/.pi/agent/extensions/old-extension" && ! -L "$home_dir/.pi/agent/extensions/old-extension" ]] || {
-    printf 'expected stale extension link to be pruned\n' >&2
-    return 1
-  }
+    "$home_dir/.config/opencode/skills/herdr" \
+    "$ROOT_DIR/skills/herdr"
+  [[ ! -e "$home_dir/.config/opencode/skills/agent-config-workflow" ]]
 )
 
 test_prune_removes_deleted_skill_links_and_preserves_unmanaged_entries() (
@@ -227,7 +92,7 @@ test_prune_removes_deleted_skill_links_and_preserves_unmanaged_entries() (
   trap 'rm -rf "$home_dir"' EXIT
 
   # Reproduce retirement after the source directory has already been deleted.
-  for target in .openclaw/workspace/skills .opencode/skills .config/opencode/skills .claude/skills .agents/skills .pi/agent/skills; do
+  for target in .config/opencode/skills .claude/skills .agents/skills .omp/agent/skills; do
     mkdir -p "$home_dir/$target/local-skill"
     printf 'local-only\n' > "$home_dir/$target/local-skill/SKILL.md"
     ln -s "$ROOT_DIR/skills/retired-test-skill" "$home_dir/$target/retired-test-skill"
@@ -236,7 +101,7 @@ test_prune_removes_deleted_skill_links_and_preserves_unmanaged_entries() (
 
   run_install "$home_dir" --prune >/dev/null
 
-  for target in .openclaw/workspace/skills .opencode/skills .config/opencode/skills .claude/skills .agents/skills .pi/agent/skills; do
+  for target in .config/opencode/skills .claude/skills .agents/skills .omp/agent/skills; do
     [[ ! -e "$home_dir/$target/retired-test-skill" && ! -L "$home_dir/$target/retired-test-skill" ]] || {
       printf 'expected deleted skill link to be pruned from %s\n' "$target" >&2
       return 1
@@ -251,14 +116,7 @@ test_managed_files_do_not_reference_legacy_plugin() (
     "$ROOT_DIR/AGENTS.md" \
     "$ROOT_DIR/install.sh" \
     "$ROOT_DIR/targets.yaml" \
-    "$ROOT_DIR/skills" \
-    "$ROOT_DIR/extensions"
-)
-
-test_sync_workflow_does_not_publish_work_identity() (
-  assert_no_matches 'pgeske''-dd|Data''dog|ddo''ghq' \
-    "$ROOT_DIR/commands/sync-agent-config.md" \
-    "$ROOT_DIR/skills/sync-agent-config"
+    "$ROOT_DIR/skills"
 )
 
 test_existing_unmanaged_agents_file_requires_force() (
@@ -298,29 +156,23 @@ test_force_replaces_stale_target_root_symlink() (
   home_dir=$(mktemp -d)
   trap 'rm -rf "$home_dir"' EXIT
 
-  mkdir -p "$home_dir/.opencode"
-  ln -s "$home_dir/old-skill-registry/skills" "$home_dir/.opencode/skills"
+  mkdir -p "$home_dir/.claude"
+  ln -s "$home_dir/old-skill-registry/skills" "$home_dir/.claude/skills"
 
   run_install "$home_dir" --force >/dev/null
 
   assert_symlink_target \
-    "$home_dir/.opencode/skills" \
+    "$home_dir/.claude/skills" \
     "$ROOT_DIR/skills"
- )
+)
 
 main() {
-  test_install_all_creates_opencode_agents_symlink
-  test_named_gather_context_install_still_installs_agents
-  test_install_all_installs_pi_extensions
-  test_extension_conflict_requires_force
-  test_extension_file_conflict_requires_force
-  test_extension_target_root_symlink_requires_force
-  test_prune_removes_stale_extension_links
+  test_install_all_links_skills_and_agents
+  test_named_skill_install_still_installs_agents
   test_prune_removes_deleted_skill_links_and_preserves_unmanaged_entries
   test_existing_unmanaged_agents_file_requires_force
   test_force_replaces_stale_target_root_symlink
   test_managed_files_do_not_reference_legacy_plugin
-  test_sync_workflow_does_not_publish_work_identity
   printf 'all installer checks passed\n'
 }
 

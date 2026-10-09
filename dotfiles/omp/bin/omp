@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Keep optional private CA trust scoped to OMP, not every shell process.
+ca_file="${XDG_CONFIG_HOME:-$HOME/.config}/omp/ca.pem"
+if [[ -z "${NODE_EXTRA_CA_CERTS:-}" && -f "$ca_file" ]]; then
+  export NODE_EXTRA_CA_CERTS="$ca_file"
+fi
+
+# The shared launcher wraps the standalone Homebrew installation. An explicit
+# binary also supports installations elsewhere without searching our own PATH.
+if [[ -n "${OMP_BINARY:-}" ]]; then
+  binary="$OMP_BINARY"
+else
+  binary="$(brew --prefix omp)/bin/omp"
+fi
+exec "$binary" "$@"

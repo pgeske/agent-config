@@ -23,6 +23,12 @@ Correctness is necessary, but not sufficient. Code should make sense to a review
 - Before handing off, read the diff as a reviewer: can someone quickly understand the interface, follow the behavior, and see why the change is needed? Simplify what makes them work unnecessarily hard. Apply repeated feedback consistently, not just at the cited line.
 - In Go tests, prefer `t.Context()` when a test context is needed.
 
+## Research and Recommendations
+
+- Before recommending real-world things (restaurants, products, travel, services, providers), gather evidence first: ratings and review counts, recent reviews, hours, price, and location. Use web search or the browser (for example, Google Maps or Yelp pages) rather than memory.
+- Cite sources for the facts behind a recommendation. If something could not be checked, say so instead of guessing.
+- When a question depends on personal context (email, calendar, documents), check connected sources such as Google Workspace before answering.
+
 ## Working Together
 
 - Preserve unrelated changes and re-check status before editing shared files. Use separate worktrees for concurrent file-modifying work.
@@ -30,7 +36,7 @@ Correctness is necessary, but not sufficient. Code should make sense to a review
 - Start searches narrowly. Avoid broad home-directory scans and open-ended watches or polling unless asked.
 - Keep commit, push, merge, and deploy operations separate so partial progress is clear.
 - Delegate only when asked, using the `herdr` skill and CLI. It covers session setup, worktree isolation, and coordination. Do not control Herdr from outside a Herdr-managed pane.
-- Leave delegated sessions open for inspection. Do not run autoreview unless explicitly requested.
+- Leave delegated sessions open for inspection.
 
 ## Git and Publishing
 
@@ -38,7 +44,7 @@ Correctness is necessary, but not sufficient. Code should make sense to a review
 - Sign commits and verify signatures before pushing. Use new commits for feedback on shared work rather than amending it unless asked.
 - Prefer native `gh stack` support for stacked PRs.
 - Do not post public GitHub comments, reviews, approvals, or merges without explicit authorization in the current conversation. For authorized review feedback, prefer pending inline comments on changed lines.
-- Keep secrets, private artifacts, and local machine paths out of published material. Keep review-helper results out of PR descriptions unless asked.
+- Keep secrets, private artifacts, and local machine paths out of published material.
 - Respect required checks, approvals, and branch protection. Never bypass protections or force an admin merge without explicit authorization for that action.
 
 ### Pull Request Descriptions
@@ -54,15 +60,5 @@ Write PR bodies to a Markdown file and use `--body-file` so formatting survives 
 
 ## Configuration and Tools
 
-- `~/agent-config` is the source of truth for shared instructions, skills, extensions, and machine setup. Edit sources there, not installed copies or symlinks. Use `agent-config-workflow` and run `~/agent-config/bootstrap.sh` after changes.
+- `~/agent-config` is the source of truth for shared instructions, skills, and machine setup. Edit sources there, not installed copies or symlinks. Use `agent-config-workflow` and run `~/agent-config/bootstrap.sh` after changes.
 - Keep credentials and machine-local configuration out of that repository. Personal repositories normally live under `~/repositories`.
-- Use `gather-context` when an answer depends on shell history, notes, or repositories outside the current workspace, before broad searching.
-- Use `design-doc-writing` for design documents and RFCs.
-- Use the `mac-computer-use` MCP and skill for native macOS apps; keep Peekaboo disabled.
-
-## Notes and Tasks
-
-- The Obsidian vault is the directory containing `.obsidian`; on this Mac it is `~/Documents/notes`. Substitute that vault root wherever a skill says `~/notes`.
-- Use `notes-workflow` for captures, running notes, recaps, and handoffs under `<vault>/raw/captures/`. Use `wiki-maintainer` only when asked to organize or ingest notes into the wiki.
-- Use `tasks-workflow` for persistent tasks in `<vault>/wiki/tasks.md`, and `dailies` for morning planning and weekly goals.
-- Tasks are personal by default; add employer-specific work only when explicitly requested.
