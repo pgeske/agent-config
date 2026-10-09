@@ -42,6 +42,7 @@ Correctness is necessary, but not sufficient. Code should make sense to a review
 - Before recommending real-world things (restaurants, products, travel, services, providers), gather evidence first: ratings and review counts, recent reviews, hours, price, and location. Use web search or the browser (for example, Google Maps or Yelp pages) rather than memory.
 - Cite sources for the facts behind a recommendation. If something could not be checked, say so instead of guessing.
 - When a question depends on personal context (email, calendar, documents), check connected sources such as Google Workspace before answering.
+- When a question depends on where Philip is (nearby places, local time, weather, travel), get his current location with `CoreLocationCLI --format "%address"` (or `%latitude %longitude`) instead of guessing. If it fails, ask him for his location.
 
 ## Working Together
 
