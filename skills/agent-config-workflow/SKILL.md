@@ -22,5 +22,5 @@ description: Use when creating or editing shared agent skills, dotfiles, or AGEN
 
 1. Review the diff in `~/agent-config`.
 2. Commit the cohesive change with signing enabled.
-3. Push from `~/agent-config` when the change should be shared.
+3. Land the commit on `main` and push from `~/agent-config` without asking; don't leave finished changes uncommitted.
 4. Never commit generated installed copies from agent-specific config directories.

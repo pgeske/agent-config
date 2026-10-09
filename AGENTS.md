@@ -40,6 +40,7 @@ Correctness is necessary, but not sufficient. Code should make sense to a review
 ## Research and Recommendations
 
 - Before recommending real-world things (restaurants, products, travel, services, providers), gather evidence first: ratings and review counts, recent reviews, hours, price, and location. Use web search or the browser (for example, Google Maps or Yelp pages) rather than memory.
+- For Reddit, read posts and comments in the browser from the start (use `www.reddit.com`; old Reddit requires login). Direct page fetches are blocked, and search snippets miss most of the discussion. Web search is fine for finding thread links, but open the threads in the browser.
 - Cite sources for the facts behind a recommendation. If something could not be checked, say so instead of guessing.
 - When a question depends on personal context (email, calendar, documents), check connected sources such as Google Workspace before answering.
 - When a question depends on where Philip is (nearby places, local time, weather, travel), get his current location with `CoreLocationCLI --format "%address"` (or `%latitude %longitude`) instead of guessing. If it fails, ask him for his location.
@@ -76,4 +77,5 @@ Write PR bodies to a Markdown file and use `--body-file` so formatting survives 
 ## Configuration and Tools
 
 - `~/agent-config` is the source of truth for shared instructions, skills, and machine setup. Edit sources there, not installed copies or symlinks. Use `agent-config-workflow` and run `~/agent-config/bootstrap.sh` after changes.
+- Finish every `~/agent-config` change by committing it (signed), landing it on `main`, and pushing, without asking first. Batch related edits into one commit when the work is done so uncommitted changes don't pile up. This overrides the general rule above about keeping commit, push, and merge separate.
 - Keep credentials and machine-local configuration out of that repository. Personal repositories normally live under `~/repositories`.
