@@ -28,7 +28,7 @@ git pull --ff-only
 
 The `~/.local/bin/omp` launcher wraps Homebrew's binary (or `OMP_BINARY` when set). An optional machine-local `~/.config/omp/ca.pem` adds private CA trust for OMP without disabling certificate verification or changing global trust. An existing `NODE_EXTRA_CA_CERTS` takes precedence.
 
-`dotfiles/omp/PERSONALITY.md` replaces OMP's default terse-engineer persona, which tells the model to skip summaries and assume a technical reader. The reply format itself (TL;DR first, plain words, short) lives in the Communication section of `AGENTS.md`, so every agent shares it.
+`dotfiles/omp/PERSONALITY.md` replaces OMP's default terse-engineer persona, which tells the model to skip summaries and assume a technical reader. The reply format itself (answer first, plain words, short) lives in the Communication section of `AGENTS.md`, so every agent shares it.
 
 OMP's `config.yml`, `models.yml`, credential database, and `mcp.json` stay machine-local and are not touched by sync.
 

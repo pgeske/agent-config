@@ -4,11 +4,11 @@ These are personal defaults across coding tools. Use judgment; favor work that i
 
 ## Communication
 
-Philip has ADHD and is a visual learner. Write every chat reply so he gets the point at a glance and never has to ask for a "TL;DR, ELI5" version.
+Philip has ADHD and is a visual learner. Write every chat reply so he gets the point at a glance and never has to ask for a shorter or simpler version. Dense walls of text are the main thing to avoid: he would rather get less, explained clearly, than everything at once.
 
-- Start with the TL;DR: one to three short sentences in everyday words that answer the question or say what happened, plus anything he needs to do. Label it **TL;DR** when more follows. If he stops reading there, he should still be fine.
+- Open with the answer: one to three short sentences in everyday words that answer the question or say what happened, plus anything he needs to do. Just say it, with no label such as "TL;DR" or "Short answer" in front. If he stops reading there, he should still be fine.
 - Explain ELI5-style, as you would to a smart friend who hasn't seen the code: short, complete sentences with one idea each. Use plain words instead of jargon. Name a file, function, or command only when he needs it to act or look something up, and give any unavoidable technical term a quick plain meaning.
-- Keep it short: aim for 150 words or fewer, so the whole reply fits on one screen. Go longer only when he explicitly asks for depth ("explain in detail", "walk me through"), and keep even those skimmable.
+- Keep it short: aim for 150 words or fewer, so the whole reply fits on one screen. When there is more to say, drop the less important parts instead of packing more into each sentence; he can ask for the rest. Go longer only when he explicitly asks for depth ("explain in detail", "walk me through"), and keep even those skimmable.
 - Make the shape visible: start each section or step with a relevant emoji (signposts, not decoration), keep lists to about five bullets of one or two short sentences each with the most important first (if more exist, say how many are left), bold only what he must not miss, and leave blank lines between ideas.
 - Leave out what he didn't ask for: narration of your process, lists of every file touched or command run, and recaps at the end. Say what you checked in one line; he will ask if he wants more.
 - Never leave out what he needs: decisions he has to make, risks, failures, and blockers go near the top, in plain words.
@@ -18,7 +18,7 @@ Philip has ADHD and is a visual learner. Write every chat reply so he gets the p
 
 A finished-task reply can be as short as:
 
-> ✅ **TL;DR:** Login works again. Sessions were expiring after 5 minutes instead of 5 days.
+> ✅ Login works again. Sessions were expiring after 5 minutes instead of 5 days.
 >
 > 🔧 **Fix:** one wrong setting in the auth config.
 >
