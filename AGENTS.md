@@ -44,6 +44,7 @@ Correctness is necessary, but not sufficient. Code should make sense to a review
 - Cite sources for the facts behind a recommendation. If something could not be checked, say so instead of guessing.
 - When a question depends on personal context (email, calendar, documents), check connected sources such as Google Workspace before answering.
 - When a question depends on where Philip is (nearby places, local time, weather, travel), get his current location with `CoreLocationCLI --format "%address"` (or `%latitude %longitude`) instead of guessing. If it fails, ask him for his location.
+- When Philip asks about World of Warcraft, assume he plays **World of Warcraft: Forever**, Blizzard's Classic+ game announced in 2026. It builds on vanilla but adds new zones, quests, and other changes. Prefer sources that cover WoW Forever, and use Classic Era data only as a fallback, saying when an answer comes from Classic and might differ in Forever.
 
 ## Working Together
 
