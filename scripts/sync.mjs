@@ -124,6 +124,12 @@ function managedItems(options) {
       target: path.join(options.configHome, "ghostty", "config"),
       optional: true,
     },
+    {
+      label: "OMP personality",
+      type: "file",
+      source: path.join(repoRoot, "dotfiles", "omp", "PERSONALITY.md"),
+      target: path.join(options.home, ".omp", "agent", "PERSONALITY.md"),
+    },
   ];
 
   if (process.platform !== "win32") {

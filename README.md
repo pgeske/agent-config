@@ -28,9 +28,11 @@ git pull --ff-only
 
 The `~/.local/bin/omp` launcher wraps Homebrew's binary (or `OMP_BINARY` when set). An optional machine-local `~/.config/omp/ca.pem` adds private CA trust for OMP without disabling certificate verification or changing global trust. An existing `NODE_EXTRA_CA_CERTS` takes precedence.
 
+`dotfiles/omp/PERSONALITY.md` replaces OMP's default terse-engineer persona, which tells the model to skip summaries and assume a technical reader. The reply format itself (TL;DR first, plain words, short) lives in the Communication section of `AGENTS.md`, so every agent shares it.
+
 OMP's `config.yml`, `models.yml`, credential database, and `mcp.json` stay machine-local and are not touched by sync.
 
-In tmux, each tab ends with an omp status mark: `○` while omp works, a green `●` when a turn finishes or omp asks a question while you're elsewhere, and nothing once you've seen it. Opening the tab clears the dot; the tab you're on only ever shows the ring. tmux never beeps for these bells. Turns that stop with an error only get the dot if omp's `error.notify` setting is on (off by default). The same marks show in the `prefix + k` window picker.
+In tmux, each tab ends with an omp status mark: omp's own animated spinner (yellow) while omp works, a green `●` when a turn finishes or omp asks a question while you're elsewhere, and nothing once you've seen it. Opening the tab clears the dot; the tab you're on only ever shows the spinner. tmux never beeps for these bells. Turns that stop with an error only get the dot if omp's `error.notify` setting is on (off by default). The same marks show in the `prefix + k` window picker.
 
 ## Herdr
 
@@ -43,6 +45,7 @@ No installer reloads Herdr, stops agents, or changes session state. Run `herdr s
 `npm run sync` manages:
 
 - `dotfiles/omp/bin/omp` → `~/.local/bin/omp`
+- `dotfiles/omp/PERSONALITY.md` → `~/.omp/agent/PERSONALITY.md`
 - `dotfiles/bin/deploy-filmstream` → `~/.local/bin/deploy-filmstream`
 - `dotfiles/zsh/zshrc` → `~/.zshrc`
 - `dotfiles/tmux/tmux.conf` → `~/.tmux.conf`
