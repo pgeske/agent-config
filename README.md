@@ -34,7 +34,7 @@ In tmux, each tab ends with an omp status mark: `○` while omp works, a green `
 
 ## Herdr
 
-Install [Herdr](https://herdr.dev) separately (config verified with 0.8.2). Only `config.toml` is managed, not the whole Herdr directory. The config keeps Ctrl+A, Cmd+Shift+[ / ] tab switching, Ctrl+N new tab, Cmd+Shift+N vertical split, symbol status indicators, in-Herdr notifications, and the official Catppuccin Frappé palette. Herdr is the default subagent launcher: fresh named agents in new unfocused tabs, with isolated worktrees for file changes.
+Install [Herdr](https://herdr.dev) separately (config verified with 0.8.2). Only `config.toml` is managed, not the whole Herdr directory. The config keeps Ctrl+A, Cmd+Shift+[ / ] tab switching, Ctrl+N new tab, symbol status indicators, in-Herdr notifications, and the built-in Dracula theme. Herdr is the default subagent launcher: fresh named agents in new unfocused tabs, with isolated worktrees for file changes.
 
 No installer reloads Herdr, stops agents, or changes session state. Run `herdr server reload-config` yourself when ready to apply config changes without closing panes.
 

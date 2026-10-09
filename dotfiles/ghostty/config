@@ -1,4 +1,4 @@
-theme = Catppuccin Frappe
+theme = Dracula
 font-family = "JetBrainsMono Nerd Font Mono"
 font-size = 20
 # Make tmux's status underline read as a crisp bottom border.
@@ -11,9 +11,17 @@ window-padding-x = 0
 window-padding-y = 0
 window-padding-color = extend-always
 
-# Let terminal multiplexers handle Chrome-style tab switching.
-keybind = super+shift+[=unbind
-keybind = super+shift+]=unbind
+# Use Chrome-style shortcuts to switch tmux windows instead of Ghostty tabs.
+# These send tmux's prefix followed by its previous/next-window bindings.
+keybind = super+shift+[=text:\x02\x08
+keybind = super+shift+]=text:\x02\x0c
+# Ctrl+Backspace closes the current tmux window: send prefix + &, which
+# tmux.conf.local binds to kill-window. tmux can't see Ctrl+Backspace itself
+# because Ghostty sends it as ^H (same byte as Ctrl+H) without extended keys.
+keybind = ctrl+backspace=text:\x02&
+# Cmd+Shift+N starts a new OMP session: send Alt+Shift+N (ESC N), which OMP
+# binds to app.session.new in ~/.omp/agent/keybindings.yml.
+keybind = super+shift+n=text:\x1bN
 
 mouse-scroll-multiplier = discrete:1
 # Keep Shift+mouse reserved for Ghostty selection/link handling, even inside tmux/apps.

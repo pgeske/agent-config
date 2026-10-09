@@ -588,11 +588,22 @@ set-option -g @omp_status '#{?#{E:@omp_working},○,#{?#{&&:#{window_bell_flag},
 set-window-option -g window-status-format ' #{=/15/…;p16:#{window_name}} #{E:@omp_status}#[fg=#737994]▕'
 set-window-option -g window-status-current-format ' #{=/15/…;p16:#{window_name}} #{E:@omp_status}#[fg=#737994]▕'
 
-# Easier mobile-friendly window selector: prefix (Ctrl-a or Ctrl-b) then k.
+# Name omp windows after the session. omp sets the pane title to
+# "π <status> <session name>" (or "π: <name>" with its spinner disabled); strip
+# that prefix so the tab shows only the name. Other programs keep tmux's default.
+set-window-option -g automatic-rename-format '#{?pane_in_mode,[tmux],#{?#{==:#{pane_current_command},omp},#{s/^π(. | [^ ]+ )//:pane_title},#{pane_current_command}}}#{?pane_dead,[dead],}'
+
+# Window selector: Ctrl-K (no prefix), or prefix (Ctrl-a or Ctrl-b) then k on mobile.
 # Show only window names and the omp status mark in the chooser.
+# Ctrl-K is taken from every pane, so shells and omp no longer see it.
 bind-key k choose-tree -Zw -F '#{window_name} #{E:@omp_status}'
+bind -n C-k choose-tree -Zw -F '#{window_name} #{E:@omp_status}'
 
 # Ctrl-N (no prefix) opens a new window running omp in the current pane's directory.
 # #!important stops Oh my tmux from stripping -c via tmux_conf_new_window_retain_current_path.
 bind -n C-n new-window -c '#{pane_current_path}' omp #!important
+
+# Close the current window without a y/n prompt (default & asks first).
+# Ghostty maps Ctrl+Backspace to prefix + & for this.
+bind & kill-window
 
