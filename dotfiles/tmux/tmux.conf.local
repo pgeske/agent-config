@@ -564,13 +564,17 @@ set-window-option -g window-status-last-style 'fg=#c6d0f5,bg=#51576d,none,unders
 set-window-option -g window-status-bell-style 'fg=#c6d0f5,bg=#51576d,none,underscore,us=#737994'
 
 # Every tab ends with a one-cell omp status mark, just before its divider:
-#   ○ working  - omp titles its pane "π <spinner> <session>" while it works,
-#                "π > ..." when idle, and "π ! ..." when it's waiting on you.
+#   ⠲ working  - omp's own spinner, animated. omp titles its pane
+#                "π <spinner frame> <session>" while it works, "π > ..." when
+#                idle, and "π ! ..." when it's waiting on you. tmux redraws the
+#                tab on every title change, so the frame moves in step with omp.
+#                Yellow, except on the tab you're on, which keeps its own text
+#                color so the spinner stays readable on the blue background.
 #   ● done     - green until you open the tab. omp rings the bell when a turn
 #                ends or it asks a question; tmux flags the tab while you're
 #                elsewhere and clears the flag when you visit it.
 #   (blank)    - idle and already seen.
-# Working wins over done, so a tab that resumed work shows the ring again. The
+# Working wins over done, so a tab that resumed work shows the spinner again. The
 # tab you're on never shows the dot: being on it counts as having seen it.
 # A tmux server started from inside Herdr keeps that Herdr pane's identity in
 # its global environment. omp then notifies Herdr instead of ringing the bell,
@@ -582,8 +586,15 @@ set-environment -gu HERDR_WORKSPACE_ID
 set-environment -gu HERDR_SOCKET_PATH
 set-window-option -g monitor-bell on
 set-option -g bell-action none  # keep the tab flag, never beep
-set-option -g @omp_working '#{P:#{?#{m/r:^π [^ >!]+( |$),#{pane_title}},1,}}'
-set-option -g @omp_status '#{?#{E:@omp_working},○,#{?#{&&:#{window_bell_flag},#{!:#{window_active}}},#[fg=#a6d189]●, }}'
+# Spinner frame of the window's first working omp pane; empty when none works.
+set-option -g @omp_frame '#{=1:#{P:#{?#{m/r:^π [^ >!]+( |$),#{pane_title}},#{s/^π //:pane_title},}}}'
+# omp's braille frames use only the top three of a cell's four dot rows, so they
+# sit above the tab text. Squeeze each frame onto the middle two rows (top row
+# to row 2, bottom row to row 3, omp's middle row dropped) so it stays centered
+# and about as small as the done dot. ⠴ and ⠦ are both inputs and outputs: map
+# them first.
+set-option -g @omp_spinner '#{s/⠏/⠖/:#{s/⠇/⠆/:#{s/⠧/⠦/:#{s/⠼/⠴/:#{s/⠸/⠰/:#{s/⠹/⠲/:#{s/⠙/⠒/:#{s/⠋/⠒/:#{s/⠦/⠤/:#{s/⠴/⠤/:#{E:@omp_frame}}}}}}}}}}}'
+set-option -g @omp_status '#{?#{E:@omp_spinner},#{?window_active,,#[fg=#e5c890]}#{E:@omp_spinner},#{?#{&&:#{window_bell_flag},#{!:#{window_active}}},#[fg=#a6d189]●, }}'
 # Keep tabs at a Chrome-like fixed 20-cell width, including the status mark.
 set-window-option -g window-status-format ' #{=/15/…;p16:#{window_name}} #{E:@omp_status}#[fg=#737994]▕'
 set-window-option -g window-status-current-format ' #{=/15/…;p16:#{window_name}} #{E:@omp_status}#[fg=#737994]▕'
