@@ -1,18 +1,9 @@
 ---
 name: music-recs-rym
-description: Use when Philip asks for album or song recommendations, especially via RateYourMusic (RYM). Covers his music taste and the working method for browsing RYM in Brave without getting blocked.
+description: Use when Philip asks for album or song recommendations through RateYourMusic (RYM). Covers how to browse RYM in Brave without getting blocked and how to turn his request into ranked picks.
 ---
 
 # Music Recommendations via RateYourMusic
-
-## Philip's taste
-
-- Favourites: Arcade Fire *Funeral* ("Wake Up", "Neighborhood" songs, "Crown of Love"); Black Country, New Road *Ants From Up There* ("Chaos Space Marine", "The Place Where He Inserted the Blade"); Willy Rodriguez *wetdream* (2023).
-- The vibe: orchestral instruments plus a full-volume indie rock band, with a powerful, broken, damaged, cathartic feel.
-- Mood descriptors all three share on RYM: **passionate, melancholic, bittersweet, longing, introspective, concept album**; often also anxious, theatrical, existential, depressive, nostalgia.
-- Dislikes: gentle or folksy chamber pop. Treat Twee Pop, Chamber Folk, Indie Folk, Neo-Acoustic, and Soft Rock as red flags (for example Belle & Sebastian, Camera Obscura).
-- Chamber Pop alone is a poor filter: it describes instruments, not mood. Rank by descriptor overlap, not genre.
-- Already recommended (October 2026): Racing Mount Pleasant (self-titled), The Dears *No Cities Left*, Blonde Redhead *Misery Is a Butterfly*, Gang of Youths *Angel in Realtime.*, Gingerbee *Apiary*, The Velvet Teen *Elysium*. Don't repeat them unless he asks.
 
 ## Browsing RYM
 
@@ -40,7 +31,8 @@ RYM has no API or data dump. Headless browsers get a Cloudflare challenge page. 
 
 ## Process
 
-1. Build candidates from a few genre-combination charts (Chamber Pop with Indie Rock, Art Rock, Emo, or Post-Rock), skipping red-flag genres.
-2. Open each shortlisted album page through the chart and read its descriptors.
-3. Rank candidates by overlap with his shared descriptors. Penalise twee or folk genres and gentle descriptors such as "mellow" or "soothing".
-4. Reply with a short table: album, how close it is, and the matching moods. Point out any folk-leaning tags.
+1. Turn his request into genre filters and target moods. If he names albums he likes, open their RYM pages first and collect the descriptors they share. Those become the target moods.
+2. Build candidates from a few chart pages that combine the relevant genres. Skip genres that clash with what he described.
+3. Open each shortlisted album page through the chart and read its descriptors.
+4. Rank candidates by how many target moods they share. Genre tags alone describe style or instruments, not mood.
+5. Reply with a short table: album, how close it is, and the matching moods. Point out tags that conflict with what he asked for.
