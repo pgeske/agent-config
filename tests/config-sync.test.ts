@@ -39,6 +39,17 @@ test("config sync targets LOCALAPPDATA for Neovim on Windows", { skip: process.p
   }
 });
 
+test("config sync targets APPDATA for Herdr on Windows", { skip: process.platform !== "win32" }, async () => {
+  const appData = await mkdtemp(join(tmpdir(), "agent-config-sync-appdata-"));
+  try {
+    const { stdout } = await runSync(["--dry-run", "--mode", "copy"], { APPDATA: appData });
+
+    assert.match(stdout, new RegExp(`Herdr config: ${escapeRegExp(join(appData, "herdr", "config.toml"))}`));
+  } finally {
+    await rm(appData, { recursive: true, force: true });
+  }
+});
+
 function escapeRegExp(input: string) {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -46,7 +57,7 @@ function escapeRegExp(input: string) {
 test("config sync copies managed dotfiles into a fake home", async () => {
   const home = await mkdtemp(join(tmpdir(), "agent-config-sync-copy-"));
   try {
-    const env = { LOCALAPPDATA: join(home, "AppData", "Local") };
+    const env = { LOCALAPPDATA: join(home, "AppData", "Local"), APPDATA: join(home, "AppData", "Roaming") };
     const args = ["--home", home, "--config-home", join(home, ".config"), "--mode", "copy"];
     const first = await runSync(args, env);
 
@@ -57,7 +68,10 @@ test("config sync copies managed dotfiles into a fake home", async () => {
       : join(home, ".config", "nvim");
     assert.equal(await readFile(join(nvimTarget, "init.lua"), "utf8"), await readFile(join(repoRoot, "dotfiles", "nvim", "init.lua"), "utf8"));
     assert.equal(await readFile(join(home, ".config", "ghostty", "config"), "utf8"), await readFile(join(repoRoot, "dotfiles", "ghostty", "config"), "utf8"));
-    assert.equal(await readFile(join(home, ".config", "herdr", "config.toml"), "utf8"), await readFile(join(repoRoot, "dotfiles", "herdr", "config.toml"), "utf8"));
+    const herdrTarget = process.platform === "win32"
+      ? join(home, "AppData", "Roaming", "herdr", "config.toml")
+      : join(home, ".config", "herdr", "config.toml");
+    assert.equal(await readFile(herdrTarget, "utf8"), await readFile(join(repoRoot, "dotfiles", "herdr", "config.toml"), "utf8"));
     if (process.platform !== "win32") {
       assert.equal(await readFile(join(home, ".local", "bin", "omp"), "utf8"), await readFile(join(repoRoot, "dotfiles", "omp", "bin", "omp"), "utf8"));
     }

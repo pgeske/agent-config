@@ -14,6 +14,10 @@ cd ~/agent-config
 
 Ensure `~/.local/bin` is early in your shell `PATH`, then run `omp` and configure authentication with `omp login`.
 
+### Windows
+
+Run the same commands from Git Bash. Turn on Windows Developer Mode first so `bootstrap.sh` can create real symlinks for skills and `AGENTS.md`. Install OMP with `irm https://omp.sh/install.ps1 | iex` and Herdr with `irm https://herdr.dev/install.ps1 | iex` in PowerShell. The bash `omp` launcher, zsh config, and deploy scripts are skipped on Windows; Herdr runs natively in Windows Terminal instead of tmux.
+
 ## Updating later
 
 ```bash
@@ -52,7 +56,7 @@ No installer reloads Herdr, stops agents, or changes session state. Run `herdr s
 - `dotfiles/tmux/tmux.conf.local` → `~/.tmux.conf.local`
 - `dotfiles/nvim/` → `~/.config/nvim/` on macOS/Linux or `%LOCALAPPDATA%\nvim\` on Windows
 - `dotfiles/ghostty/config` → `~/.config/ghostty/config`
-- `dotfiles/herdr/config.toml` → `~/.config/herdr/config.toml`
+- `dotfiles/herdr/config.toml` → `~/.config/herdr/config.toml` on macOS/Linux or `%APPDATA%\herdr\config.toml` on Windows
 
 Static files use symlinks on macOS/Linux and copies on Windows.
 

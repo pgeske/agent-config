@@ -14,6 +14,12 @@ require_command git
 require_command node
 require_command npm
 
+# Git Bash's `ln -s` silently copies by default. Ask for real Windows symlinks
+# (needs Developer Mode) so skills and AGENTS.md track this checkout.
+case "$(uname -s)" in
+  MINGW* | MSYS*) export MSYS="winsymlinks:nativestrict" ;;
+esac
+
 printf 'Installing agent-config dependencies...\n'
 cd "$ROOT_DIR"
 npm ci --ignore-scripts

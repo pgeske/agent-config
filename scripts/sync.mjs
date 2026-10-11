@@ -55,16 +55,17 @@ function parseArgs(argv) {
   const currentHome = path.resolve(os.homedir());
   options.home = resolveUserPath(options.home, currentHome);
   options.configHome = resolveUserPath(options.configHome ?? process.env.XDG_CONFIG_HOME ?? path.join(options.home, ".config"), options.home);
-  options.localAppData = resolveUserPath(defaultLocalAppData(options.home, currentHome), options.home);
+  options.localAppData = resolveUserPath(defaultAppData(options.home, currentHome, "LOCALAPPDATA", "Local"), options.home);
+  options.roamingAppData = resolveUserPath(defaultAppData(options.home, currentHome, "APPDATA", "Roaming"), options.home);
   if (options.mode === "auto") options.mode = process.platform === "win32" ? "copy" : "symlink";
   return options;
 }
 
-function defaultLocalAppData(home, currentHome) {
-  if (process.platform === "win32" && pathsEqual(home, currentHome) && process.env.LOCALAPPDATA) {
-    return process.env.LOCALAPPDATA;
+function defaultAppData(home, currentHome, envName, folder) {
+  if (process.platform === "win32" && pathsEqual(home, currentHome) && process.env[envName]) {
+    return process.env[envName];
   }
-  return path.join(home, "AppData", "Local");
+  return path.join(home, "AppData", folder);
 }
 
 function pathsEqual(left, right) {
@@ -77,6 +78,12 @@ function pathsEqual(left, right) {
 function neovimConfigTarget(options, platform = process.platform) {
   if (platform === "win32") return path.join(options.localAppData, "nvim");
   return path.join(options.configHome, "nvim");
+}
+
+// Herdr reads %APPDATA%\herdr\config.toml on Windows instead of the XDG path.
+function herdrConfigTarget(options, platform = process.platform) {
+  if (platform === "win32") return path.join(options.roamingAppData, "herdr", "config.toml");
+  return path.join(options.configHome, "herdr", "config.toml");
 }
 
 function requireValue(argv, index, flag) {
@@ -97,7 +104,7 @@ function managedItems(options) {
       label: "Herdr config",
       type: "file",
       source: path.join(repoRoot, "dotfiles", "herdr", "config.toml"),
-      target: path.join(options.configHome, "herdr", "config.toml"),
+      target: herdrConfigTarget(options),
     },
     {
       label: "tmux config",
