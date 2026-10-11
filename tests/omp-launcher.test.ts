@@ -31,3 +31,19 @@ test("OMP launcher preserves arguments and scopes optional CA trust", { skip: pr
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test("OMP launcher falls back to the standalone install when Homebrew is absent", { skip: process.platform === "win32" }, async () => {
+  const home = await mkdtemp(join(tmpdir(), "omp-launcher-standalone-"));
+  try {
+    const data = join(home, "data");
+    const binary = join(data, "omp", "bin", "omp");
+    await mkdir(join(data, "omp", "bin"), { recursive: true });
+    await writeFile(binary, '#!/bin/bash\nprintf "standalone %s\\n" "$@"\n', { mode: 0o755 });
+    // A PATH with only system directories hides any Homebrew install on the test machine.
+    const env = { HOME: home, XDG_DATA_HOME: data, PATH: "/usr/bin:/bin" };
+    const { stdout } = await exec("/bin/bash", [launcher, "--version"], { env });
+    assert.equal(stdout, "standalone --version\n");
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});

@@ -14,9 +14,9 @@ cd ~/agent-config
 
 Ensure `~/.local/bin` is early in your shell `PATH`, then run `omp` and configure authentication with `omp login`.
 
-### Windows
+### Linux and WSL
 
-Run the same commands from Git Bash. Turn on Windows Developer Mode first so `bootstrap.sh` can create real symlinks for skills and `AGENTS.md`. Install OMP with `irm https://omp.sh/install.ps1 | iex` and Herdr with `irm https://herdr.dev/install.ps1 | iex` in PowerShell. The bash `omp` launcher, zsh config, and deploy scripts are skipped on Windows; Herdr runs natively in Windows Terminal instead of tmux.
+On Windows, use this setup inside WSL2 Ubuntu rather than natively. Without Homebrew, install OMP with `curl -fsSL https://omp.sh/install | PI_INSTALL_DIR="$HOME/.local/share/omp/bin" sh`, because the shared launcher occupies `~/.local/bin/omp`. The zsh config needs `fzf` (0.48+) and `zoxide`. Put machine-specific shell setup, such as nvm or aliases, in `~/.zshrc.local`; the shared `.zshrc` sources it.
 
 ## Updating later
 
@@ -30,7 +30,7 @@ git pull --ff-only
 
 ## OMP
 
-The `~/.local/bin/omp` launcher wraps Homebrew's binary (or `OMP_BINARY` when set). An optional machine-local `~/.config/omp/ca.pem` adds private CA trust for OMP without disabling certificate verification or changing global trust. An existing `NODE_EXTRA_CA_CERTS` takes precedence.
+The `~/.local/bin/omp` launcher wraps Homebrew's binary, falls back to `~/.local/share/omp/bin/omp` when Homebrew is absent, and honors `OMP_BINARY` when set. An optional machine-local `~/.config/omp/ca.pem` adds private CA trust for OMP without disabling certificate verification or changing global trust. An existing `NODE_EXTRA_CA_CERTS` takes precedence.
 
 `dotfiles/omp/PERSONALITY.md` replaces OMP's default terse-engineer persona, which tells the model to skip summaries and assume a technical reader. The reply format itself (answer first, plain words, short) lives in the Communication section of `AGENTS.md`, so every agent shares it.
 
