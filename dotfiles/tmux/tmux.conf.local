@@ -614,6 +614,12 @@ bind -n C-k choose-tree -Zw -F '#{window_name} #{E:@omp_status}'
 # #!important stops Oh my tmux from stripping -c via tmux_conf_new_window_retain_current_path.
 bind -n C-n new-window -c '#{pane_current_path}' omp #!important
 
+# Alt+Shift+[ / Alt+Shift+] (no prefix) switch to the previous/next window.
+# This is the PC-keyboard twin of Ghostty's Cmd+Shift+[ / ] on the Mac: Alt sits where Cmd does,
+# and Windows reserves the Windows key, so terminals there can't forward Win+Shift+[ / ].
+bind -n 'M-{' previous-window
+bind -n 'M-}' next-window
+
 # Close the current window without a y/n prompt (default & asks first).
 # Ghostty maps Ctrl+Backspace to prefix + & for this.
 bind & kill-window
